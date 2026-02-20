@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Search,
   HelpCircle,
@@ -9,6 +12,7 @@ import {
   RefreshCw,
   Info,
   X,
+  Users,
 } from "lucide-react";
 import {
   Breadcrumb,
@@ -23,7 +27,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -41,15 +44,43 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type {
-  Product,
-  AdjustmentMode,
-  IncrementMode,
-  ProductSelectionType,
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import type { Product } from "@/data/constants";
+import {
+  SUB_CATEGORIES,
+  SEGMENTS,
+  BRANDS,
+  BASED_ON_PROFILES,
+  SAMPLE_CUSTOMERS,
 } from "@/data/constants";
-import { SUB_CATEGORIES, SEGMENTS, BRANDS, BASED_ON_PROFILES } from "@/data/constants";
 
-// Temporary sample data — replace with API fetch when backend is ready
+// ── Schema ──
+
+const pricingFormSchema = z.object({
+  selectionType: z.enum(["one", "multiple", "all"]),
+  selectedProductIds: z.array(z.string()).min(1, "Select at least one product"),
+  basedOn: z.string().min(1, "Select a base pricing profile"),
+  adjustmentMode: z.enum(["fixed", "dynamic"]),
+  incrementMode: z.enum(["increase", "decrease"]),
+  adjustments: z.record(z.string(), z.number().min(0, "Must be 0 or greater")),
+  selectedCustomerIds: z
+    .array(z.string())
+    .min(1, "Select at least one customer"),
+});
+
+type PricingFormValues = z.infer<typeof pricingFormSchema>;
+
+type WizardStep = 2 | 3 | "review";
+
+// ── Sample products (replace with API fetch) ──
+
 const SAMPLE_PRODUCTS: Product[] = [
   {
     id: "1",
@@ -109,22 +140,26 @@ const BRAND_COLORS: Record<string, string> = {
   "Lacourte-Godbillon": "bg-rose-800",
 };
 
+const DEFAULT_ADJUSTMENT = 5;
+
+// ── Helpers ──
+
 function calculateNewPrice(
   basedOnPrice: number,
   adjustment: number,
-  mode: AdjustmentMode,
-  direction: IncrementMode,
+  mode: "fixed" | "dynamic",
+  direction: "increase" | "decrease",
 ): number {
   let result: number;
   if (mode === "fixed") {
-    result = direction === "increase"
-      ? basedOnPrice + adjustment
-      : basedOnPrice - adjustment;
+    result =
+      direction === "increase"
+        ? basedOnPrice + adjustment
+        : basedOnPrice - adjustment;
   } else {
     const delta = (adjustment / 100) * basedOnPrice;
-    result = direction === "increase"
-      ? basedOnPrice + delta
-      : basedOnPrice - delta;
+    result =
+      direction === "increase" ? basedOnPrice + delta : basedOnPrice - delta;
   }
   return Math.max(0, Math.round(result * 100) / 100);
 }
@@ -133,106 +168,242 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+// ── Component ──
+
 export function PricingSetup() {
-  // --- Product selection state ---
-  const [selectionType, setSelectionType] = useState<ProductSelectionType>("multiple");
+  const [currentStep, setCurrentStep] = useState<WizardStep>(2);
+
+  const form = useForm<PricingFormValues>({
+    resolver: zodResolver(pricingFormSchema),
+    defaultValues: {
+      selectionType: "multiple",
+      selectedProductIds: [],
+      basedOn: "global",
+      adjustmentMode: "fixed",
+      incrementMode: "decrease",
+      adjustments: {},
+      selectedCustomerIds: [],
+    },
+  });
+
+  // Non-form filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [skuFilter, setSkuFilter] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [segmentFilter, setSegmentFilter] = useState<string>("");
-  const [brandFilter, setBrandFilter] = useState<string>("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
 
-  // --- Pricing state ---
-  const [basedOn, setBasedOn] = useState("global");
-  const [adjustmentMode, setAdjustmentMode] = useState<AdjustmentMode>("fixed");
-  const [incrementMode, setIncrementMode] = useState<IncrementMode>("decrease");
-  const [adjustmentValues, setAdjustmentValues] = useState<Record<string, number>>({});
-  const defaultAdjustment = 5;
+  // Watch form values
+  const selectionType = form.watch("selectionType");
+  const selectedIds = form.watch("selectedProductIds");
+  const basedOn = form.watch("basedOn");
+  const adjustmentMode = form.watch("adjustmentMode");
+  const incrementMode = form.watch("incrementMode");
+  const adjustments = form.watch("adjustments");
+  const selectedCustomerIds = form.watch("selectedCustomerIds");
 
-  // --- Products (to be replaced with API fetch) ---
   const products = SAMPLE_PRODUCTS;
+  const customers = SAMPLE_CUSTOMERS;
 
-  // --- Derived: filtered products ---
+  // ── Derived: products ──
+
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       const query = searchQuery.toLowerCase();
       const sku = skuFilter.toLowerCase();
-      const matchesSearch = !query || p.title.toLowerCase().includes(query) || p.skuCode.toLowerCase().includes(query);
-      const matchesSku = !sku || p.skuCode.toLowerCase().includes(sku) || p.title.toLowerCase().includes(sku);
-      const matchesCategory = !categoryFilter || p.subCategoryId === categoryFilter;
+      const matchesSearch =
+        !query ||
+        p.title.toLowerCase().includes(query) ||
+        p.skuCode.toLowerCase().includes(query);
+      const matchesSku =
+        !sku ||
+        p.skuCode.toLowerCase().includes(sku) ||
+        p.title.toLowerCase().includes(sku);
+      const matchesCategory =
+        !categoryFilter || p.subCategoryId === categoryFilter;
       const matchesSegment = !segmentFilter || p.segmentId === segmentFilter;
       const matchesBrand = !brandFilter || p.brand === brandFilter;
-      return matchesSearch && matchesSku && matchesCategory && matchesSegment && matchesBrand;
+      return (
+        matchesSearch &&
+        matchesSku &&
+        matchesCategory &&
+        matchesSegment &&
+        matchesBrand
+      );
     });
-  }, [products, searchQuery, skuFilter, categoryFilter, segmentFilter, brandFilter]);
+  }, [
+    products,
+    searchQuery,
+    skuFilter,
+    categoryFilter,
+    segmentFilter,
+    brandFilter,
+  ]);
 
-  // --- Derived: active filters for chips ---
   const activeFilters: { label: string; clear: () => void }[] = [];
-  if (categoryFilter) activeFilters.push({ label: categoryFilter, clear: () => setCategoryFilter("") });
-  if (segmentFilter) activeFilters.push({ label: segmentFilter, clear: () => setSegmentFilter("") });
-  if (brandFilter) activeFilters.push({ label: brandFilter, clear: () => setBrandFilter("") });
+  if (categoryFilter)
+    activeFilters.push({
+      label: categoryFilter,
+      clear: () => setCategoryFilter(""),
+    });
+  if (segmentFilter)
+    activeFilters.push({
+      label: segmentFilter,
+      clear: () => setSegmentFilter(""),
+    });
+  if (brandFilter)
+    activeFilters.push({ label: brandFilter, clear: () => setBrandFilter("") });
 
-  // --- Derived: selected products for price table ---
-  const selectedProducts = products.filter((p) => selectedIds.has(p.id));
-
-  // --- Derived: based-on profile name ---
+  const selectedProducts = products.filter((p) => selectedIds.includes(p.id));
   const basedOnProfile = BASED_ON_PROFILES.find((p) => p.id === basedOn);
   const basedOnLabel = basedOnProfile?.name ?? "Global Wholesale Price";
 
-  // --- Handlers ---
+  // ── Derived: customers ──
+
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch) return customers;
+    const query = customerSearch.toLowerCase();
+    return customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(query) ||
+        c.business.toLowerCase().includes(query),
+    );
+  }, [customers, customerSearch]);
+
+  const selectedCustomers = customers.filter((c) =>
+    selectedCustomerIds.includes(c.id),
+  );
+
+  // ── Handlers: products ──
+
   function toggleProduct(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (selectionType === "one") {
-        if (next.has(id)) {
-          next.delete(id);
-        } else {
-          next.clear();
-          next.add(id);
-        }
-      } else {
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-      }
-      return next;
-    });
-  }
-
-  function selectAll() {
-    setSelectedIds(new Set(filteredProducts.map((p) => p.id)));
-  }
-
-  function deselectAll() {
-    setSelectedIds(new Set());
-  }
-
-  function handleSelectionTypeChange(value: string) {
-    const type = value as ProductSelectionType;
-    setSelectionType(type);
-    if (type === "all") {
-      setSelectedIds(new Set(products.map((p) => p.id)));
+    const current = form.getValues("selectedProductIds");
+    let next: string[];
+    if (selectionType === "one") {
+      next = current.includes(id) ? [] : [id];
     } else {
-      setSelectedIds(new Set());
+      next = current.includes(id)
+        ? current.filter((x) => x !== id)
+        : [...current, id];
+    }
+    form.setValue("selectedProductIds", next, { shouldValidate: true });
+  }
+
+  function selectAllProducts() {
+    form.setValue(
+      "selectedProductIds",
+      filteredProducts.map((p) => p.id),
+      { shouldValidate: true },
+    );
+  }
+
+  function deselectAllProducts() {
+    form.setValue("selectedProductIds", [], { shouldValidate: true });
+  }
+
+  function handleSelectionTypeChange(
+    value: PricingFormValues["selectionType"],
+  ) {
+    form.setValue("selectionType", value);
+    if (value === "all") {
+      form.setValue(
+        "selectedProductIds",
+        products.map((p) => p.id),
+        { shouldValidate: true },
+      );
+    } else {
+      form.setValue("selectedProductIds", [], { shouldValidate: true });
     }
   }
 
   function getAdjustment(productId: string): number {
-    return adjustmentValues[productId] ?? defaultAdjustment;
+    return adjustments[productId] ?? DEFAULT_ADJUSTMENT;
   }
 
   function setProductAdjustment(productId: string, value: number) {
-    setAdjustmentValues((prev) => ({ ...prev, [productId]: value }));
+    const current = form.getValues("adjustments");
+    form.setValue("adjustments", {
+      ...current,
+      [productId]: Math.max(0, value),
+    });
   }
 
   function getBasedOnPrice(product: Product): number {
     return product.globalWholesalePrice;
   }
 
+  // ── Handlers: customers ──
+
+  function toggleCustomer(id: string) {
+    const current = form.getValues("selectedCustomerIds");
+    const next = current.includes(id)
+      ? current.filter((x) => x !== id)
+      : [...current, id];
+    form.setValue("selectedCustomerIds", next, { shouldValidate: true });
+  }
+
+  function selectAllCustomers() {
+    form.setValue(
+      "selectedCustomerIds",
+      filteredCustomers.map((c) => c.id),
+      { shouldValidate: true },
+    );
+  }
+
+  function deselectAllCustomers() {
+    form.setValue("selectedCustomerIds", [], { shouldValidate: true });
+  }
+
+  // ── Step navigation ──
+
+  async function advanceFromStepTwo() {
+    const valid = await form.trigger([
+      "selectionType",
+      "selectedProductIds",
+      "basedOn",
+      "adjustmentMode",
+      "incrementMode",
+    ]);
+    if (!valid) return;
+
+    // Enrich adjustments with defaults
+    const enriched: Record<string, number> = {};
+    for (const id of form.getValues("selectedProductIds")) {
+      enriched[id] = form.getValues("adjustments")[id] ?? DEFAULT_ADJUSTMENT;
+    }
+    form.setValue("adjustments", enriched);
+    setCurrentStep(3);
+  }
+
+  async function advanceFromStepThree() {
+    const valid = await form.trigger(["selectedCustomerIds"]);
+    if (valid) setCurrentStep("review");
+  }
+
+  function onPublish(data: PricingFormValues) {
+    console.log("Publishing pricing profile:", data);
+  }
+
+  // ── Summary helpers ──
+
+  function adjustmentSummaryText(): string {
+    const modeLabel = adjustmentMode === "fixed" ? "Fixed" : "Dynamic";
+    const dirLabel = incrementMode === "increase" ? "Increase" : "Decrease";
+    const adj =
+      selectedProducts.length > 0
+        ? getAdjustment(selectedProducts[0].id)
+        : DEFAULT_ADJUSTMENT;
+    const valDisplay = adjustmentMode === "fixed" ? `$${adj}` : `${adj}%`;
+    return `${modeLabel} ${dirLabel} of ${valDisplay}`;
+  }
+
+  // ── Render ──
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* ── Header ── */}
-      <header className="flex items-center justify-between bg-foboh px-6 py-3 text-white">
+      <header className="flex items-center justify-between bg-foboh px-6 py-6 text-white">
         <div>
           <p className="text-base font-semibold">Hello, Ekemini</p>
           <p className="text-xs text-white/80">Tue, 13 February 2024</p>
@@ -256,406 +427,925 @@ export function PricingSetup() {
         </div>
       </header>
 
-      {/* ── Main content ── */}
-      <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
-        {/* Breadcrumb + actions */}
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="#">Pricing Profile</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="font-semibold">Setup a Profile</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Setup your pricing profile, select products and assign customers
-            </p>
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="rounded-xl p-6 bg-muted">
+          {/* Breadcrumb */}
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="#">Pricing Profile</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage className="font-semibold">
+                      Setup a Profile
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Setup your pricing profile, select products and assign customers
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="sm">
+                Cancel
+              </Button>
+              <Button variant="outline" size="sm">
+                Save as Draft
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm">Cancel</Button>
-            <Button variant="outline" size="sm">Save as Draft</Button>
-          </div>
-        </div>
 
-        {/* ── Step 1: Basic Pricing Profile ── */}
-        <Card className="mb-4">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Basic Pricing Profile</h2>
-                <p className="text-sm text-muted-foreground">
-                  Cheeky little description goes in here
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="size-2.5 rounded-full bg-emerald-500" />
-                <span className="font-medium text-emerald-600">Completed</span>
-              </div>
-            </div>
-            <Separator className="my-4" />
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">You&apos;ve created a Price Profile</p>
-                <p className="text-base font-semibold">Heaps Normal #4</p>
-                <p className="text-sm text-muted-foreground">
-                  Marked as <span className="font-medium text-foreground">Default</span>, and expires in{" "}
-                  <span className="font-medium text-foreground">18 Days</span> (Date Here)
-                </p>
-              </div>
-              <button type="button" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-                <Pencil className="size-3.5" />
-                Make Changes
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── Step 2: Set Product Pricing ── */}
-        <Card className="mb-4">
-          <CardContent className="p-6">
-            <h2 className="text-lg font-semibold">Set Product Pricing</h2>
-            <p className="text-sm text-muted-foreground">Set details</p>
-            <Separator className="my-4" />
-
-            {/* Selection type */}
-            <div className="mb-6">
-              <Label className="mb-2 block text-sm">You are creating a Pricing Profile for</Label>
-              <RadioGroup
-                value={selectionType}
-                onValueChange={handleSelectionTypeChange}
-                className="flex gap-6"
-              >
-                {[
-                  { value: "one", label: "One Product" },
-                  { value: "multiple", label: "Multiple Products" },
-                  { value: "all", label: "All Products" },
-                ].map((opt) => (
-                  <div key={opt.value} className="flex items-center gap-2">
-                    <RadioGroupItem value={opt.value} id={`sel-${opt.value}`} />
-                    <Label htmlFor={`sel-${opt.value}`} className="cursor-pointer text-sm">
-                      {opt.label}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            {/* Search & filters */}
-            {selectionType !== "all" && (
-              <div className="mb-4">
-                <Label className="mb-2 block text-sm">Search for Products</Label>
-                <div className="flex flex-wrap gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Search"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-40 pl-9"
-                    />
-                  </div>
-                  <Input
-                    placeholder="Product / SKU"
-                    value={skuFilter}
-                    onChange={(e) => setSkuFilter(e.target.value)}
-                    className="w-36"
-                  />
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="w-36">
-                      <SelectValue placeholder="Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUB_CATEGORIES.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={segmentFilter} onValueChange={setSegmentFilter}>
-                    <SelectTrigger className="w-36">
-                      <SelectValue placeholder="Segment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SEGMENTS.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={brandFilter} onValueChange={setBrandFilter}>
-                    <SelectTrigger className="w-36">
-                      <SelectValue placeholder="Brand" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BRANDS.map((b) => (
-                        <SelectItem key={b} value={b}>{b}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {/* Results count + active filter chips */}
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-              <span>
-                Showing <span className="font-semibold">({filteredProducts.length} Result{filteredProducts.length !== 1 ? "s" : ""})</span>
-                {(searchQuery || skuFilter) && (
-                  <> for <span className="font-medium">{searchQuery || skuFilter}</span></>
-                )}
-              </span>
-              {activeFilters.map((f) => (
-                <Badge key={f.label} variant="secondary" className="gap-1 pl-2 pr-1">
-                  {f.label}
-                  <button type="button" onClick={f.clear} className="rounded-full p-0.5 hover:bg-muted">
-                    <X className="size-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-
-            {/* Select/deselect all */}
-            {selectionType !== "one" && (
-              <div className="mb-3 flex items-center gap-4 text-sm">
-                <button
-                  type="button"
-                  onClick={deselectAll}
-                  className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-                >
-                  <span className="flex size-4 items-center justify-center rounded-full border">
-                    <X className="size-2.5" />
-                  </span>
-                  Deselect All
-                </button>
-                <button
-                  type="button"
-                  onClick={selectAll}
-                  className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-                >
-                  <span className="flex size-4 items-center justify-center rounded-full border">
-                    <span className="size-2 rounded-full bg-current" />
-                  </span>
-                  Select all
-                </button>
-              </div>
-            )}
-
-            {/* Product list */}
-            <div className="mb-4 space-y-1">
-              {filteredProducts.map((product) => {
-                const isSelected = selectedIds.has(product.id);
-                const color = BRAND_COLORS[product.brand] ?? "bg-gray-500";
-                return (
-                  <label
-                    key={product.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50"
-                  >
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => toggleProduct(product.id)}
-                    />
-                    <div className={`flex size-10 shrink-0 items-center justify-center rounded text-xs font-bold text-white ${color}`}>
-                      {product.title.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium leading-tight">{product.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        SKU {product.skuCode} &middot; {product.subCategoryId} &middot; {product.segmentId}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onPublish)}>
+              {/* ══ Step 1: Basic Pricing Profile (always completed) ══ */}
+              <Card className="mb-4 py-0">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold">
+                        Basic Pricing Profile
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        Cheeky little description goes in here
                       </p>
                     </div>
-                  </label>
-                );
-              })}
-              {filteredProducts.length === 0 && (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No products match your filters.
-                </p>
-              )}
-            </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="size-2.5 rounded-full bg-emerald-500" />
+                      <span className="font-medium text-emerald-600">
+                        Completed
+                      </span>
+                    </div>
+                  </div>
+                  <Separator className="my-4" />
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        You&apos;ve created a Price Profile
+                      </p>
+                      <p className="text-base font-semibold">Heaps Normal #4</p>
+                      <p className="text-sm text-muted-foreground">
+                        Marked as{" "}
+                        <span className="font-medium text-foreground">
+                          Default
+                        </span>
+                        , and expires in{" "}
+                        <span className="font-medium text-foreground">
+                          18 Days
+                        </span>{" "}
+                        (Date Here)
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="size-3.5" />
+                      Make Changes
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* Selected count */}
-            {selectedProducts.length > 0 && (
-              <p className="mb-4 text-sm">
-                You&apos;ve selected <span className="font-semibold">{selectedProducts.length} Product{selectedProducts.length !== 1 ? "s" : ""}</span>,
-                these will be added <span className="font-medium">(Heaps Normal #4)</span>
-              </p>
-            )}
+              {/* ══ Step 2: Set Product Pricing ══ */}
+              {currentStep === 2 ? (
+                <Card className="mb-4 py-0">
+                  <CardContent className="p-6">
+                    <h2 className="text-lg font-semibold">
+                      Set Product Pricing
+                    </h2>
+                    <p className="text-sm text-muted-foreground">Set details</p>
+                    <Separator className="my-4" />
 
-            <Separator className="my-6" />
+                    {/* Selection type */}
+                    <FormField
+                      control={form.control}
+                      name="selectionType"
+                      render={({ field }) => (
+                        <FormItem className="mb-6">
+                          <FormLabel className="text-sm">
+                            You are creating a Pricing Profile for
+                          </FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              value={field.value}
+                              onValueChange={(v) =>
+                                handleSelectionTypeChange(
+                                  v as PricingFormValues["selectionType"],
+                                )
+                              }
+                              className="flex gap-6"
+                            >
+                              {(
+                                [
+                                  ["one", "One Product"],
+                                  ["multiple", "Multiple Products"],
+                                  ["all", "All Products"],
+                                ] as const
+                              ).map(([value, label]) => (
+                                <div
+                                  key={value}
+                                  className="flex items-center gap-2"
+                                >
+                                  <RadioGroupItem
+                                    value={value}
+                                    id={`sel-${value}`}
+                                  />
+                                  <label
+                                    htmlFor={`sel-${value}`}
+                                    className="cursor-pointer text-sm"
+                                  >
+                                    {label}
+                                  </label>
+                                </div>
+                              ))}
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-            {/* Based on */}
-            <div className="mb-6">
-              <Label className="mb-2 block text-sm">Based on</Label>
-              <Select value={basedOn} onValueChange={setBasedOn}>
-                <SelectTrigger className="w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BASED_ON_PROFILES.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Adjustment mode */}
-            <div className="mb-4">
-              <Label className="mb-2 block text-sm">Set Price Adjustment Mode</Label>
-              <RadioGroup
-                value={adjustmentMode}
-                onValueChange={(v) => setAdjustmentMode(v as AdjustmentMode)}
-                className="flex gap-6"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="fixed" id="adj-fixed" />
-                  <Label htmlFor="adj-fixed" className="cursor-pointer text-sm">Fixed ($)</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="dynamic" id="adj-dynamic" />
-                  <Label htmlFor="adj-dynamic" className="cursor-pointer text-sm">Dynamic (%)</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {/* Increment mode */}
-            <div className="mb-4">
-              <Label className="mb-2 block text-sm">Set Price Adjustment Increment Mode</Label>
-              <RadioGroup
-                value={incrementMode}
-                onValueChange={(v) => setIncrementMode(v as IncrementMode)}
-                className="flex gap-6"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="increase" id="inc-increase" />
-                  <Label htmlFor="inc-increase" className="cursor-pointer text-sm">Increase +</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="decrease" id="inc-decrease" />
-                  <Label htmlFor="inc-decrease" className="cursor-pointer text-sm">Decrease -</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {/* Info notice */}
-            <div className="mb-6 flex items-center gap-2 text-sm">
-              <Info className="size-4 shrink-0 text-amber-500" />
-              <span>
-                The adjusted price will be calculated from{" "}
-                <span className="font-semibold text-foboh">{basedOnLabel}</span>{" "}
-                selected above
-              </span>
-            </div>
-
-            {/* Refresh button */}
-            <div className="mb-3 flex justify-end">
-              <button
-                type="button"
-                className="flex items-center gap-1.5 text-sm text-foboh hover:underline"
-              >
-                Refresh New Price Table
-                <RefreshCw className="size-3.5" />
-              </button>
-            </div>
-
-            {/* Price table */}
-            {selectedProducts.length > 0 ? (
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8">
-                        <Checkbox
-                          checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
-                          onCheckedChange={(checked) => {
-                            if (checked) selectAll();
-                            else deselectAll();
-                          }}
-                        />
-                      </TableHead>
-                      <TableHead>Product Title</TableHead>
-                      <TableHead>SKU Code</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">{basedOnLabel}</TableHead>
-                      <TableHead className="text-center">Adjustment</TableHead>
-                      <TableHead className="text-right">New Price</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedProducts.map((product) => {
-                      const basedOnPrice = getBasedOnPrice(product);
-                      const adj = getAdjustment(product.id);
-                      const newPrice = calculateNewPrice(basedOnPrice, adj, adjustmentMode, incrementMode);
-                      const sign = incrementMode === "decrease" ? "-" : "+";
-                      const symbol = adjustmentMode === "fixed" ? "$" : "%";
-
-                      return (
-                        <TableRow key={product.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedIds.has(product.id)}
-                              onCheckedChange={() => toggleProduct(product.id)}
+                    {/* Search & filters */}
+                    {selectionType !== "all" && (
+                      <div className="mb-4">
+                        <p className="mb-2 text-sm font-medium">
+                          Search for Products
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              placeholder="Search"
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="w-40 pl-9"
                             />
-                          </TableCell>
-                          <TableCell className="font-medium">{product.title}</TableCell>
-                          <TableCell className="text-muted-foreground">{product.skuCode}</TableCell>
-                          <TableCell className="text-muted-foreground">{product.subCategoryId}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(basedOnPrice)}</TableCell>
-                          <TableCell className="text-center">
-                            <div className="inline-flex items-center gap-1 rounded bg-foboh/10 px-3 py-1.5 text-sm text-foboh">
-                              <span>{sign}{adjustmentMode === "fixed" ? "$ " : ""}</span>
-                              <input
-                                type="number"
-                                value={adj}
-                                onChange={(e) => setProductAdjustment(product.id, Math.max(0, Number(e.target.value)))}
-                                className="w-16 border-none bg-transparent text-center text-sm outline-none"
-                                min={0}
-                                step={adjustmentMode === "fixed" ? 0.01 : 1}
-                              />
-                              {adjustmentMode === "dynamic" && <span>%</span>}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(newPrice)}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
-                Select products above to see the price table.
-              </div>
-            )}
+                          </div>
+                          <Input
+                            placeholder="Product / SKU"
+                            value={skuFilter}
+                            onChange={(e) => setSkuFilter(e.target.value)}
+                            className="w-36"
+                          />
+                          <Select
+                            value={categoryFilter}
+                            onValueChange={setCategoryFilter}
+                          >
+                            <SelectTrigger className="w-36">
+                              <SelectValue placeholder="Category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SUB_CATEGORIES.map((c) => (
+                                <SelectItem key={c} value={c}>
+                                  {c}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={segmentFilter}
+                            onValueChange={setSegmentFilter}
+                          >
+                            <SelectTrigger className="w-36">
+                              <SelectValue placeholder="Segment" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SEGMENTS.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {s}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={brandFilter}
+                            onValueChange={setBrandFilter}
+                          >
+                            <SelectTrigger className="w-36">
+                              <SelectValue placeholder="Brand" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {BRANDS.map((b) => (
+                                <SelectItem key={b} value={b}>
+                                  {b}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
 
-            {/* Footer */}
-            <div className="mt-6 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Your entries are saved automatically</p>
-              <div className="flex items-center gap-3">
-                <Button variant="ghost">Back</Button>
-                <Button className="bg-foboh text-white hover:bg-foboh/90">Next</Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                    {/* Result count + chips */}
+                    <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+                      <span>
+                        Showing{" "}
+                        <span className="font-semibold">
+                          ({filteredProducts.length} Result
+                          {filteredProducts.length !== 1 ? "s" : ""})
+                        </span>
+                        {(searchQuery || skuFilter) && (
+                          <>
+                            {" "}
+                            for{" "}
+                            <span className="font-medium">
+                              {searchQuery || skuFilter}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                      {activeFilters.map((f) => (
+                        <Badge
+                          key={f.label}
+                          variant="secondary"
+                          className="gap-1 pl-2 pr-1"
+                        >
+                          {f.label}
+                          <button
+                            type="button"
+                            onClick={f.clear}
+                            className="rounded-full p-0.5 hover:bg-muted"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
 
-        {/* ── Step 3: Assign Customers ── */}
-        <Card>
-          <CardContent className="flex items-start justify-between p-6">
-            <div>
-              <h2 className="text-lg font-semibold">Assign Customers to Pricing Profile</h2>
-              <p className="text-sm text-muted-foreground">
-                Choose which customers this profile will be applied to
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="size-2.5 rounded-full bg-gray-400" />
-              <span className="text-muted-foreground">Not Started</span>
-            </div>
-          </CardContent>
-        </Card>
+                    {/* Select / deselect all */}
+                    {selectionType !== "one" && (
+                      <div className="mb-3 flex items-center gap-4 text-sm">
+                        <button
+                          type="button"
+                          onClick={deselectAllProducts}
+                          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <span className="flex size-4 items-center justify-center rounded-full border">
+                            <X className="size-2.5" />
+                          </span>
+                          Deselect All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={selectAllProducts}
+                          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <span className="flex size-4 items-center justify-center rounded-full border">
+                            <span className="size-2 rounded-full bg-current" />
+                          </span>
+                          Select all
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Product list */}
+                    <FormField
+                      control={form.control}
+                      name="selectedProductIds"
+                      render={() => (
+                        <FormItem className="mb-4">
+                          <div className="space-y-1">
+                            {filteredProducts.map((product) => {
+                              const isSelected = selectedIds.includes(
+                                product.id,
+                              );
+                              const color =
+                                BRAND_COLORS[product.brand] ?? "bg-gray-500";
+                              return (
+                                <label
+                                  key={product.id}
+                                  className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50"
+                                >
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() =>
+                                      toggleProduct(product.id)
+                                    }
+                                  />
+                                  <div
+                                    className={`flex size-10 shrink-0 items-center justify-center rounded text-xs font-bold text-white ${color}`}
+                                  >
+                                    {product.title.slice(0, 2).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium leading-tight">
+                                      {product.title}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      SKU {product.skuCode} &middot;{" "}
+                                      {product.subCategoryId} &middot;{" "}
+                                      {product.segmentId}
+                                    </p>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                            {filteredProducts.length === 0 && (
+                              <p className="py-8 text-center text-sm text-muted-foreground">
+                                No products match your filters.
+                              </p>
+                            )}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {selectedProducts.length > 0 && (
+                      <p className="mb-4 text-sm">
+                        You&apos;ve selected{" "}
+                        <span className="font-semibold">
+                          {selectedProducts.length} Product
+                          {selectedProducts.length !== 1 ? "s" : ""}
+                        </span>
+                        , these will be added{" "}
+                        <span className="font-medium">(Heaps Normal #4)</span>
+                      </p>
+                    )}
+
+                    <Separator className="my-6" />
+
+                    {/* Based on */}
+                    <FormField
+                      control={form.control}
+                      name="basedOn"
+                      render={({ field }) => (
+                        <FormItem className="mb-6">
+                          <FormLabel className="text-sm">Based on</FormLabel>
+                          <FormControl>
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger className="w-64">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {BASED_ON_PROFILES.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    {p.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Adjustment mode */}
+                    <FormField
+                      control={form.control}
+                      name="adjustmentMode"
+                      render={({ field }) => (
+                        <FormItem className="mb-4">
+                          <FormLabel className="text-sm">
+                            Set Price Adjustment Mode
+                          </FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              className="flex gap-6"
+                            >
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem value="fixed" id="adj-fixed" />
+                                <label
+                                  htmlFor="adj-fixed"
+                                  className="cursor-pointer text-sm"
+                                >
+                                  Fixed ($)
+                                </label>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem
+                                  value="dynamic"
+                                  id="adj-dynamic"
+                                />
+                                <label
+                                  htmlFor="adj-dynamic"
+                                  className="cursor-pointer text-sm"
+                                >
+                                  Dynamic (%)
+                                </label>
+                              </div>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Increment mode */}
+                    <FormField
+                      control={form.control}
+                      name="incrementMode"
+                      render={({ field }) => (
+                        <FormItem className="mb-4">
+                          <FormLabel className="text-sm">
+                            Set Price Adjustment Increment Mode
+                          </FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              className="flex gap-6"
+                            >
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem
+                                  value="increase"
+                                  id="inc-increase"
+                                />
+                                <label
+                                  htmlFor="inc-increase"
+                                  className="cursor-pointer text-sm"
+                                >
+                                  Increase +
+                                </label>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem
+                                  value="decrease"
+                                  id="inc-decrease"
+                                />
+                                <label
+                                  htmlFor="inc-decrease"
+                                  className="cursor-pointer text-sm"
+                                >
+                                  Decrease -
+                                </label>
+                              </div>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Info notice */}
+                    <div className="mb-6 flex items-center gap-2 text-sm">
+                      <Info className="size-4 shrink-0 text-amber-500" />
+                      <span>
+                        The adjusted price will be calculated from{" "}
+                        <span className="font-semibold text-foboh">
+                          {basedOnLabel}
+                        </span>{" "}
+                        selected above
+                      </span>
+                    </div>
+
+                    {/* Refresh */}
+                    <div className="mb-3 flex justify-end">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1.5 text-sm text-foboh hover:underline"
+                      >
+                        Refresh New Price Table
+                        <RefreshCw className="size-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Price table */}
+                    {selectedProducts.length > 0 ? (
+                      <div className="rounded-lg border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-8">
+                                <Checkbox
+                                  checked={
+                                    selectedProducts.length ===
+                                      filteredProducts.length &&
+                                    filteredProducts.length > 0
+                                  }
+                                  onCheckedChange={(c) =>
+                                    c
+                                      ? selectAllProducts()
+                                      : deselectAllProducts()
+                                  }
+                                />
+                              </TableHead>
+                              <TableHead>Product Title</TableHead>
+                              <TableHead>SKU Code</TableHead>
+                              <TableHead>Category</TableHead>
+                              <TableHead className="text-right">
+                                {basedOnLabel}
+                              </TableHead>
+                              <TableHead className="text-center">
+                                Adjustment
+                              </TableHead>
+                              <TableHead className="text-right">
+                                New Price
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selectedProducts.map((product) => {
+                              const basedOnPrice = getBasedOnPrice(product);
+                              const adj = getAdjustment(product.id);
+                              const newPrice = calculateNewPrice(
+                                basedOnPrice,
+                                adj,
+                                adjustmentMode,
+                                incrementMode,
+                              );
+                              const sign =
+                                incrementMode === "decrease" ? "-" : "+";
+                              return (
+                                <TableRow key={product.id}>
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selectedIds.includes(product.id)}
+                                      onCheckedChange={() =>
+                                        toggleProduct(product.id)
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-medium">
+                                    {product.title}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {product.skuCode}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {product.subCategoryId}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {formatCurrency(basedOnPrice)}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <div className="inline-flex items-center gap-1 rounded bg-foboh/10 px-3 py-1.5 text-sm text-foboh">
+                                      <span>
+                                        {sign}
+                                        {adjustmentMode === "fixed" ? "$ " : ""}
+                                      </span>
+                                      <input
+                                        type="number"
+                                        value={adj}
+                                        onChange={(e) =>
+                                          setProductAdjustment(
+                                            product.id,
+                                            Number(e.target.value),
+                                          )
+                                        }
+                                        className="w-16 border-none bg-transparent text-center text-sm outline-none"
+                                        min={0}
+                                        step={
+                                          adjustmentMode === "fixed" ? 0.01 : 1
+                                        }
+                                      />
+                                      {adjustmentMode === "dynamic" && (
+                                        <span>%</span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right font-medium">
+                                    {formatCurrency(newPrice)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+                        Select products above to see the price table.
+                      </div>
+                    )}
+
+                    {/* Step 2 footer */}
+                    <div className="mt-6 flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        Your entries are saved automatically
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <Button type="button" variant="ghost">
+                          Back
+                        </Button>
+                        <Button
+                          type="button"
+                          className="bg-foboh text-white hover:bg-foboh/90"
+                          onClick={advanceFromStepTwo}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                /* Step 2 collapsed summary */
+                <Card className="mb-4 py-0">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold">
+                          Set Product Pricing
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                          Cheeky little description goes in here
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="size-2.5 rounded-full bg-emerald-500" />
+                        <span className="font-medium text-emerald-600">
+                          Completed
+                        </span>
+                      </div>
+                    </div>
+                    <Separator className="my-4" />
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex -space-x-2">
+                          {selectedProducts.slice(0, 3).map((product) => {
+                            const color =
+                              BRAND_COLORS[product.brand] ?? "bg-gray-500";
+                            return (
+                              <div
+                                key={product.id}
+                                className={`flex size-8 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white ${color}`}
+                              >
+                                {product.title.slice(0, 2).toUpperCase()}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            You&apos;ve selected{" "}
+                            <span className="font-semibold text-foreground">
+                              {selectedProducts.length} Product
+                              {selectedProducts.length !== 1 ? "s" : ""}
+                            </span>
+                          </p>
+                          <p className="text-sm font-semibold">
+                            {selectedProducts
+                              .slice(0, 3)
+                              .map((p) => p.title.split(" ")[0])
+                              .join(" & ")}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            With Price Adjustment Mode set to{" "}
+                            <span className="font-semibold text-foreground">
+                              {adjustmentSummaryText()}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentStep(2)}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        <Pencil className="size-3.5" />
+                        Make Changes
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* ══ Step 3: Assign Customers ══ */}
+              {currentStep === 2 ? (
+                /* Not started placeholder */
+                <Card className="py-0">
+                  <CardContent className="flex items-start justify-between p-6">
+                    <div>
+                      <h2 className="text-lg font-semibold">
+                        Assign Customers to Pricing Profile
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        Choose which customers this profile will be applied to
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="size-2.5 rounded-full bg-gray-400" />
+                      <span className="text-muted-foreground">Not Started</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : currentStep === 3 ? (
+                /* Active customer assignment */
+                <Card className="mb-4 py-0">
+                  <CardContent className="p-6">
+                    <h2 className="text-lg font-semibold">
+                      Assign Customers to Pricing Profile
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Choose which customers this profile will be applied to
+                    </p>
+                    <Separator className="my-4" />
+
+                    {/* Customer search */}
+                    <div className="mb-4">
+                      <p className="mb-2 text-sm font-medium">
+                        Search for Customers
+                      </p>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by name or business"
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          className="w-72 pl-9"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Select / deselect all */}
+                    <div className="mb-3 flex items-center gap-4 text-sm">
+                      <button
+                        type="button"
+                        onClick={deselectAllCustomers}
+                        className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                      >
+                        <span className="flex size-4 items-center justify-center rounded-full border">
+                          <X className="size-2.5" />
+                        </span>
+                        Deselect All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={selectAllCustomers}
+                        className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                      >
+                        <span className="flex size-4 items-center justify-center rounded-full border">
+                          <span className="size-2 rounded-full bg-current" />
+                        </span>
+                        Select all
+                      </button>
+                    </div>
+
+                    {/* Customer list */}
+                    <FormField
+                      control={form.control}
+                      name="selectedCustomerIds"
+                      render={() => (
+                        <FormItem className="mb-4">
+                          <div className="space-y-1">
+                            {filteredCustomers.map((customer) => {
+                              const isSelected = selectedCustomerIds.includes(
+                                customer.id,
+                              );
+                              return (
+                                <label
+                                  key={customer.id}
+                                  className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50"
+                                >
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() =>
+                                      toggleCustomer(customer.id)
+                                    }
+                                  />
+                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-600">
+                                    {customer.name
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium leading-tight">
+                                      {customer.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {customer.business}
+                                    </p>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                            {filteredCustomers.length === 0 && (
+                              <p className="py-8 text-center text-sm text-muted-foreground">
+                                No customers match your search.
+                              </p>
+                            )}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {selectedCustomers.length > 0 && (
+                      <p className="mb-4 text-sm">
+                        <span className="font-semibold">
+                          {selectedCustomers.length} customer
+                          {selectedCustomers.length !== 1 ? "s" : ""}
+                        </span>{" "}
+                        will receive this pricing profile
+                      </p>
+                    )}
+
+                    {/* Step 3 footer */}
+                    <div className="mt-6 flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        Your entries are saved automatically
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setCurrentStep(2)}
+                        >
+                          Back
+                        </Button>
+                        <Button
+                          type="button"
+                          className="bg-foboh text-white hover:bg-foboh/90"
+                          onClick={advanceFromStepThree}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                /* Step 3 collapsed summary (review state) */
+                <Card className="mb-4 py-0">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold">
+                          Assign Customers to Pricing Profile
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                          Choose which customers this profile will be applied to
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="size-2.5 rounded-full bg-emerald-500" />
+                        <span className="font-medium text-emerald-600">
+                          Completed
+                        </span>
+                      </div>
+                    </div>
+                    <Separator className="my-4" />
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-full bg-gray-200">
+                          <Users className="size-5 text-gray-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">
+                            {selectedCustomers.length} customer
+                            {selectedCustomers.length !== 1 ? "s" : ""} assigned
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {selectedCustomers
+                              .slice(0, 3)
+                              .map((c) => c.business)
+                              .join(", ")}
+                            {selectedCustomers.length > 3 &&
+                              ` +${selectedCustomers.length - 3} more`}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentStep(3)}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        <Pencil className="size-3.5" />
+                        Make Changes
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* ══ Review footer ══ */}
+              {currentStep === "review" && (
+                <div className="mt-6 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Your entries are saved automatically
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setCurrentStep(3)}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="bg-foboh text-white hover:bg-foboh/90"
+                    >
+                      Save &amp; Publish Profile
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </form>
+          </Form>
+        </div>
       </main>
     </div>
   );

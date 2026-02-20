@@ -1,16 +1,6 @@
 "use client";
 
 import {
-  LayoutDashboard,
-  ClipboardList,
-  Users,
-  Settings as SettingsIcon,
-  DollarSign,
-  Truck,
-  Blocks,
-  Package,
-} from "lucide-react";
-import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -21,6 +11,18 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import {
+  Blocks,
+  ClipboardList,
+  DollarSign,
+  LayoutDashboard,
+  Package,
+  Settings as SettingsIcon,
+  Truck,
+  Users,
+} from "lucide-react";
+import Image from "next/image";
+import { Separator } from "./ui/separator";
 
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, href: "#" },
@@ -30,16 +32,15 @@ const NAV_ITEMS = [
   { label: "Pricing", icon: DollarSign, href: "#", active: true },
   { label: "Freight", icon: Truck, href: "#", badge: "NEW" },
   { label: "Integrations", icon: Blocks, href: "#" },
-  { label: "Settings", icon: SettingsIcon, href: "#" },
 ];
 
 export function AppSidebar() {
   return (
-    <Sidebar>
+    <Sidebar className="group-data-[side=left]:border-r-0">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="pt-16">
               {NAV_ITEMS.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
@@ -59,15 +60,28 @@ export function AppSidebar() {
                   )}
                 </SidebarMenuItem>
               ))}
+              <Separator />
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className="h-10">
+                  <a href="#">
+                    <SettingsIcon className="size-4" />
+                    <span>Settings</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="px-3 pb-4">
-          <span className="text-lg font-bold tracking-tight text-foreground">
-            FOBOH
-          </span>
+        <div className="px-3 pb-4 flex items-center">
+          <Image
+            width={100}
+            height={100}
+            className="object-contain"
+            src="/FOBOH_Logo_final 1.png"
+            alt=""
+          />
         </div>
       </SidebarFooter>
     </Sidebar>

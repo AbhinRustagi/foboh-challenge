@@ -45,3 +45,20 @@ export const BRANDS = [
 export const BASED_ON_PROFILES: PricingProfile[] = [
   { id: "global", name: "Global Wholesale Price" },
 ];
+
+export type Customer = {
+  id: string;
+  name: string;
+  business: string;
+};
+
+export const SAMPLE_CUSTOMERS: Customer[] = [
+  { id: "c1", name: "James Wilson", business: "Wilson's Wine Bar" },
+  { id: "c2", name: "Sarah Chen", business: "The Barrel Room" },
+  { id: "c3", name: "Marcus Thompson", business: "Riverside Bottleshop" },
+  { id: "c4", name: "Emily Rodriguez", business: "Craft & Cork" },
+  { id: "c5", name: "David Park", business: "Park Avenue Cellars" },
+  { id: "c6", name: "Lisa Nguyen", business: "Nguyen's Fine Wines" },
+  { id: "c7", name: "Tom Bradley", business: "Bradley's Pub & Grill" },
+  { id: "c8", name: "Anna Kowalski", business: "The Wine Collective" },
+];
