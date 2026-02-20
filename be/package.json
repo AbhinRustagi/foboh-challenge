@@ -8,5 +8,11 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "fuse.js": "^7.1.0",
+    "lodash": "^4.17.23",
+    "zod": "^4.3.6"
   }
 }
