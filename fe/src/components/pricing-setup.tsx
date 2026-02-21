@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
+  ArrowUp,
   Search,
   HelpCircle,
   Settings,
@@ -24,7 +25,13 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -398,6 +405,8 @@ export function PricingSetup() {
     return `${modeLabel} ${dirLabel} of ${valDisplay}`;
   }
 
+  const today = new Date();
+
   // ── Render ──
 
   return (
@@ -405,8 +414,15 @@ export function PricingSetup() {
       {/* ── Header ── */}
       <header className="flex items-center justify-between bg-foboh px-6 py-6 text-white">
         <div>
-          <p className="text-base font-semibold">Hello, Ekemini</p>
-          <p className="text-xs text-white/80">Tue, 13 February 2024</p>
+          <p className="text-base font-medium">Hello, Ekemini</p>
+          <p className="text-xs text-white/80">
+            {today.toLocaleDateString("en-AU", {
+              weekday: "short",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
         </div>
         <div className="flex items-center gap-4">
           <button type="button" className="rounded-full bg-white/20 p-2">
@@ -428,65 +444,69 @@ export function PricingSetup() {
       </header>
 
       <main className="flex-1 overflow-y-auto p-6">
-        <div className="rounded-xl p-6 bg-muted">
-          {/* Breadcrumb */}
-          <div className="mb-6 flex items-start justify-between">
-            <div>
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href="#">Pricing Profile</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage className="font-semibold">
-                      Setup a Profile
-                    </BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Setup your pricing profile, select products and assign customers
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm">
-                Cancel
-              </Button>
-              <Button variant="outline" size="sm">
-                Save as Draft
-              </Button>
-            </div>
-          </div>
-
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onPublish)}>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onPublish)}>
+            <div className="rounded-xl p-6 bg-muted">
+              {/* Breadcrumb */}
+              <div className="mb-6 flex items-start justify-between">
+                <div className="space-y-2">
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem className="text-base">
+                        <BreadcrumbLink href="#">
+                          Pricing Profile
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator />
+                      <BreadcrumbItem className="text-base">
+                        <BreadcrumbPage className="font-medium">
+                          Setup a Profile
+                        </BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Setup your pricing profile, select products and assign
+                    customers
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Button variant="ghost" size="sm">
+                    Cancel
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    Save as Draft
+                  </Button>
+                </div>
+              </div>
               {/* ══ Step 1: Basic Pricing Profile (always completed) ══ */}
-              <Card className="mb-4 py-0">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h2 className="text-lg font-semibold">
-                        Basic Pricing Profile
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Cheeky little description goes in here
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="size-2.5 rounded-full bg-emerald-500" />
-                      <span className="font-medium text-emerald-600">
-                        Completed
-                      </span>
-                    </div>
+              <Card className="mb-4">
+                <CardHeader className="flex items-start justify-between">
+                  <div className="space-y-1.5">
+                    <CardTitle className="text-lg font-medium">
+                      Basic Pricing Profile
+                    </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground">
+                      Cheeky little description goes in here
+                    </CardDescription>
                   </div>
-                  <Separator className="my-4" />
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="size-2.5 rounded-full bg-emerald-500" />
+                    <span className="font-medium text-emerald-600">
+                      Completed
+                    </span>
+                  </div>
+                </CardHeader>
+                <div className="px-6">
+                  <Separator />
+                </div>
+                <CardContent>
                   <div className="flex items-start justify-between">
-                    <div>
+                    <div className="space-y-1.5">
                       <p className="text-xs text-muted-foreground">
                         You&apos;ve created a Price Profile
                       </p>
-                      <p className="text-base font-semibold">Heaps Normal #4</p>
+                      <p className="text-base font-medium">Heaps Normal #4</p>
                       <p className="text-sm text-muted-foreground">
                         Marked as{" "}
                         <span className="font-medium text-foreground">
@@ -512,14 +532,19 @@ export function PricingSetup() {
 
               {/* ══ Step 2: Set Product Pricing ══ */}
               {currentStep === 2 ? (
-                <Card className="mb-4 py-0">
-                  <CardContent className="p-6">
-                    <h2 className="text-lg font-semibold">
+                <Card className="mb-4">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-medium">
                       Set Product Pricing
-                    </h2>
-                    <p className="text-sm text-muted-foreground">Set details</p>
-                    <Separator className="my-4" />
-
+                    </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground">
+                      Set details
+                    </CardDescription>
+                  </CardHeader>
+                  <div className="px-6">
+                    <Separator />
+                  </div>
+                  <CardContent>
                     {/* Selection type */}
                     <FormField
                       control={form.control}
@@ -644,7 +669,7 @@ export function PricingSetup() {
                     <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
                       <span>
                         Showing{" "}
-                        <span className="font-semibold">
+                        <span className="font-medium">
                           ({filteredProducts.length} Result
                           {filteredProducts.length !== 1 ? "s" : ""})
                         </span>
@@ -758,7 +783,7 @@ export function PricingSetup() {
                     {selectedProducts.length > 0 && (
                       <p className="mb-4 text-sm">
                         You&apos;ve selected{" "}
-                        <span className="font-semibold">
+                        <span className="font-medium">
                           {selectedProducts.length} Product
                           {selectedProducts.length !== 1 ? "s" : ""}
                         </span>
@@ -892,7 +917,7 @@ export function PricingSetup() {
                       <Info className="size-4 shrink-0 text-amber-500" />
                       <span>
                         The adjusted price will be calculated from{" "}
-                        <span className="font-semibold text-foboh">
+                        <span className="font-medium text-foboh">
                           {basedOnLabel}
                         </span>{" "}
                         selected above
@@ -1041,25 +1066,27 @@ export function PricingSetup() {
                 </Card>
               ) : (
                 /* Step 2 collapsed summary */
-                <Card className="mb-4 py-0">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h2 className="text-lg font-semibold">
-                          Set Product Pricing
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                          Cheeky little description goes in here
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="size-2.5 rounded-full bg-emerald-500" />
-                        <span className="font-medium text-emerald-600">
-                          Completed
-                        </span>
-                      </div>
+                <Card className="mb-4">
+                  <CardHeader className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-lg font-medium">
+                        Set Product Pricing
+                      </CardTitle>
+                      <CardDescription className="text-sm text-muted-foreground">
+                        Cheeky little description goes in here
+                      </CardDescription>
                     </div>
-                    <Separator className="my-4" />
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="size-2.5 rounded-full bg-emerald-500" />
+                      <span className="font-medium text-emerald-600">
+                        Completed
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <div className="px-6">
+                    <Separator />
+                  </div>
+                  <CardContent>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className="flex -space-x-2">
@@ -1079,12 +1106,12 @@ export function PricingSetup() {
                         <div>
                           <p className="text-xs text-muted-foreground">
                             You&apos;ve selected{" "}
-                            <span className="font-semibold text-foreground">
+                            <span className="font-medium text-foreground">
                               {selectedProducts.length} Product
                               {selectedProducts.length !== 1 ? "s" : ""}
                             </span>
                           </p>
-                          <p className="text-sm font-semibold">
+                          <p className="text-sm font-medium">
                             {selectedProducts
                               .slice(0, 3)
                               .map((p) => p.title.split(" ")[0])
@@ -1092,7 +1119,7 @@ export function PricingSetup() {
                           </p>
                           <p className="text-sm text-muted-foreground">
                             With Price Adjustment Mode set to{" "}
-                            <span className="font-semibold text-foreground">
+                            <span className="font-medium text-foreground">
                               {adjustmentSummaryText()}
                             </span>
                           </p>
@@ -1114,34 +1141,37 @@ export function PricingSetup() {
               {/* ══ Step 3: Assign Customers ══ */}
               {currentStep === 2 ? (
                 /* Not started placeholder */
-                <Card className="py-0">
-                  <CardContent className="flex items-start justify-between p-6">
+                <Card>
+                  <CardHeader className="flex justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold">
+                      <CardTitle className="text-lg font-medium">
                         Assign Customers to Pricing Profile
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
+                      </CardTitle>
+                      <CardDescription className="text-sm text-muted-foreground">
                         Choose which customers this profile will be applied to
-                      </p>
+                      </CardDescription>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <span className="size-2.5 rounded-full bg-gray-400" />
                       <span className="text-muted-foreground">Not Started</span>
                     </div>
-                  </CardContent>
+                  </CardHeader>
                 </Card>
               ) : currentStep === 3 ? (
                 /* Active customer assignment */
-                <Card className="mb-4 py-0">
-                  <CardContent className="p-6">
-                    <h2 className="text-lg font-semibold">
+                <Card className="mb-4">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-medium">
                       Assign Customers to Pricing Profile
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
+                    </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground">
                       Choose which customers this profile will be applied to
-                    </p>
-                    <Separator className="my-4" />
-
+                    </CardDescription>
+                  </CardHeader>
+                  <div className="px-4">
+                    <Separator className="px-6" />
+                  </div>
+                  <CardContent>
                     {/* Customer search */}
                     <div className="mb-4">
                       <p className="mb-2 text-sm font-medium">
@@ -1204,7 +1234,7 @@ export function PricingSetup() {
                                       toggleCustomer(customer.id)
                                     }
                                   />
-                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-600">
+                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
                                     {customer.name
                                       .split(" ")
                                       .map((n) => n[0])
@@ -1234,7 +1264,7 @@ export function PricingSetup() {
 
                     {selectedCustomers.length > 0 && (
                       <p className="mb-4 text-sm">
-                        <span className="font-semibold">
+                        <span className="font-medium">
                           {selectedCustomers.length} customer
                           {selectedCustomers.length !== 1 ? "s" : ""}
                         </span>{" "}
@@ -1272,7 +1302,7 @@ export function PricingSetup() {
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h2 className="text-lg font-semibold">
+                        <h2 className="text-lg font-medium">
                           Assign Customers to Pricing Profile
                         </h2>
                         <p className="text-sm text-muted-foreground">
@@ -1293,7 +1323,7 @@ export function PricingSetup() {
                           <Users className="size-5 text-gray-600" />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold">
+                          <p className="text-sm font-medium">
                             {selectedCustomers.length} customer
                             {selectedCustomers.length !== 1 ? "s" : ""} assigned
                           </p>
@@ -1319,34 +1349,42 @@ export function PricingSetup() {
                   </CardContent>
                 </Card>
               )}
-
-              {/* ══ Review footer ══ */}
-              {currentStep === "review" && (
-                <div className="mt-6 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Your entries are saved automatically
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setCurrentStep(3)}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="bg-foboh text-white hover:bg-foboh/90"
-                    >
-                      Save &amp; Publish Profile
-                    </Button>
-                  </div>
+            </div>
+            {/* ══ Review footer ══ */}
+            {currentStep === "review" && (
+              <div className="mt-6 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Your entries are saved automatically
+                </p>
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setCurrentStep(3)}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-foboh text-white hover:bg-foboh/90"
+                  >
+                    Save &amp; Publish Profile
+                  </Button>
                 </div>
-              )}
-            </form>
-          </Form>
-        </div>
+              </div>
+            )}
+          </form>
+        </Form>
       </main>
+
+      {/* Scroll to top */}
+      <Button
+        type="button"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className="fixed cursor-pointer bottom-6 right-6 z-50 flex size-10 items-center justify-center rounded-full bg-black text-white shadow-lg hover:bg-black/90"
+      >
+        <ArrowUp className="size-5" />
+      </Button>
     </div>
   );
 }
