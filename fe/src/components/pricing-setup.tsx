@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -59,14 +60,15 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { Product } from "@/data/constants";
+import type { Product, Customer } from "@/data/constants";
+import { BASED_ON_PROFILES } from "@/data/constants";
 import {
-  SUB_CATEGORIES,
-  SEGMENTS,
-  BRANDS,
-  BASED_ON_PROFILES,
-  SAMPLE_CUSTOMERS,
-} from "@/data/constants";
+  fetchProducts,
+  fetchCustomers,
+  fetchSegments,
+  fetchBrands,
+  createPricingProfile,
+} from "@/lib/fetchers";
 
 // ── Schema ──
 
@@ -85,61 +87,6 @@ const pricingFormSchema = z.object({
 type PricingFormValues = z.infer<typeof pricingFormSchema>;
 
 type WizardStep = 2 | 3 | "review";
-
-// ── Sample products (replace with API fetch) ──
-
-const SAMPLE_PRODUCTS: Product[] = [
-  {
-    id: "1",
-    title: "High Garden Pinot Noir 2021",
-    skuCode: "HGVPIN216",
-    brand: "High Garden",
-    categoryId: "Alcoholic Beverage",
-    subCategoryId: "Wine",
-    segmentId: "Red",
-    globalWholesalePrice: 279.06,
-  },
-  {
-    id: "2",
-    title: "Koyama Methode Brut Nature NV",
-    skuCode: "KOYBRUNV6",
-    brand: "Koyama Wines",
-    categoryId: "Alcoholic Beverage",
-    subCategoryId: "Wine",
-    segmentId: "Sparkling",
-    globalWholesalePrice: 120.0,
-  },
-  {
-    id: "3",
-    title: "Koyama Riesling 2018",
-    skuCode: "KOYNR1837",
-    brand: "Koyama Wines",
-    categoryId: "Alcoholic Beverage",
-    subCategoryId: "Wine",
-    segmentId: "Port/Dessert",
-    globalWholesalePrice: 215.04,
-  },
-  {
-    id: "4",
-    title: "Koyama Tussock Riesling 2019",
-    skuCode: "KOYRIE19",
-    brand: "Koyama Wines",
-    categoryId: "Alcoholic Beverage",
-    subCategoryId: "Wine",
-    segmentId: "White",
-    globalWholesalePrice: 215.04,
-  },
-  {
-    id: "5",
-    title: "Lacourte-Godbillon Brut Cru NV",
-    skuCode: "LACBNATNV6",
-    brand: "Lacourte-Godbillon",
-    categoryId: "Alcoholic Beverage",
-    subCategoryId: "Wine",
-    segmentId: "Sparkling",
-    globalWholesalePrice: 409.32,
-  },
-];
 
 const BRAND_COLORS: Record<string, string> = {
   "High Garden": "bg-amber-800",
@@ -201,6 +148,41 @@ export function PricingSetup() {
   const [brandFilter, setBrandFilter] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
 
+  // Data from backend
+  const productsQuery = useQuery({
+    queryKey: ["products"],
+    queryFn: () => fetchProducts(),
+  });
+  const customersQuery = useQuery({
+    queryKey: ["customers"],
+    queryFn: () => fetchCustomers(),
+  });
+  const segmentsQuery = useQuery({
+    queryKey: ["segments"],
+    queryFn: fetchSegments,
+  });
+  const brandsQuery = useQuery({
+    queryKey: ["brands"],
+    queryFn: fetchBrands,
+  });
+  const publishMutation = useMutation({
+    mutationFn: createPricingProfile,
+  });
+
+  const products = productsQuery.data ?? [];
+  const customers = customersQuery.data ?? [];
+  const segments = segmentsQuery.data ?? [];
+  const brands = brandsQuery.data ?? [];
+  // Sub-categories: static until backend provides a dedicated endpoint
+  const subCategories = [
+    "Wine",
+    "Beer",
+    "Liquor & Spirits",
+    "Cider",
+    "Premixed & Ready-to-Drink",
+    "Other",
+  ];
+
   // Watch form values
   const selectionType = form.watch("selectionType");
   const selectedIds = form.watch("selectedProductIds");
@@ -209,9 +191,6 @@ export function PricingSetup() {
   const incrementMode = form.watch("incrementMode");
   const adjustments = form.watch("adjustments");
   const selectedCustomerIds = form.watch("selectedCustomerIds");
-
-  const products = SAMPLE_PRODUCTS;
-  const customers = SAMPLE_CUSTOMERS;
 
   // ── Derived: products ──
 
@@ -389,7 +368,7 @@ export function PricingSetup() {
   }
 
   function onPublish(data: PricingFormValues) {
-    console.log("Publishing pricing profile:", data);
+    publishMutation.mutate(data);
   }
 
   // ── Summary helpers ──
@@ -624,7 +603,7 @@ export function PricingSetup() {
                               <SelectValue placeholder="Category" />
                             </SelectTrigger>
                             <SelectContent>
-                              {SUB_CATEGORIES.map((c) => (
+                              {subCategories.map((c) => (
                                 <SelectItem key={c} value={c}>
                                   {c}
                                 </SelectItem>
@@ -639,7 +618,7 @@ export function PricingSetup() {
                               <SelectValue placeholder="Segment" />
                             </SelectTrigger>
                             <SelectContent>
-                              {SEGMENTS.map((s) => (
+                              {segments.map((s) => (
                                 <SelectItem key={s} value={s}>
                                   {s}
                                 </SelectItem>
@@ -654,7 +633,7 @@ export function PricingSetup() {
                               <SelectValue placeholder="Brand" />
                             </SelectTrigger>
                             <SelectContent>
-                              {BRANDS.map((b) => (
+                              {brands.map((b) => (
                                 <SelectItem key={b} value={b}>
                                   {b}
                                 </SelectItem>
@@ -728,6 +707,26 @@ export function PricingSetup() {
                     )}
 
                     {/* Product list */}
+                    {productsQuery.isLoading && (
+                      <p className="py-8 text-center text-sm text-muted-foreground">
+                        Loading products...
+                      </p>
+                    )}
+                    {productsQuery.isError && (
+                      <div className="py-8 text-center">
+                        <p className="text-sm text-destructive">
+                          Failed to load products.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => productsQuery.refetch()}
+                          className="mt-2 text-sm text-foboh hover:underline"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                    {productsQuery.isSuccess && (
                     <FormField
                       control={form.control}
                       name="selectedProductIds"
@@ -779,6 +778,7 @@ export function PricingSetup() {
                         </FormItem>
                       )}
                     />
+                    )}
 
                     {selectedProducts.length > 0 && (
                       <p className="mb-4 text-sm">
@@ -1213,6 +1213,26 @@ export function PricingSetup() {
                     </div>
 
                     {/* Customer list */}
+                    {customersQuery.isLoading && (
+                      <p className="py-8 text-center text-sm text-muted-foreground">
+                        Loading customers...
+                      </p>
+                    )}
+                    {customersQuery.isError && (
+                      <div className="py-8 text-center">
+                        <p className="text-sm text-destructive">
+                          Failed to load customers.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => customersQuery.refetch()}
+                          className="mt-2 text-sm text-foboh hover:underline"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                    {customersQuery.isSuccess && (
                     <FormField
                       control={form.control}
                       name="selectedCustomerIds"
@@ -1261,6 +1281,7 @@ export function PricingSetup() {
                         </FormItem>
                       )}
                     />
+                    )}
 
                     {selectedCustomers.length > 0 && (
                       <p className="mb-4 text-sm">
@@ -1367,8 +1388,11 @@ export function PricingSetup() {
                   <Button
                     type="submit"
                     className="bg-foboh text-white hover:bg-foboh/90"
+                    disabled={publishMutation.isPending}
                   >
-                    Save &amp; Publish Profile
+                    {publishMutation.isPending
+                      ? "Publishing..."
+                      : "Save & Publish Profile"}
                   </Button>
                 </div>
               </div>
