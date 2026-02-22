@@ -46,6 +46,20 @@ export const BASED_ON_PROFILES: PricingProfile[] = [
   { id: "global", name: "Global Wholesale Price" },
 ];
 
+export type CalculatedPrice = {
+  productId: string;
+  basedOnPrice: number;
+  adjustment: number;
+  newPrice: number;
+};
+
+export type CalculatePricesRequest = {
+  productIds: string[];
+  adjustmentMode: AdjustmentMode;
+  incrementMode: IncrementMode;
+  adjustments: Record<string, number>;
+};
+
 export type Customer = {
   id: string;
   name: string;

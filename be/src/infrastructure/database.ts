@@ -64,6 +64,22 @@ export function getSubCategories(): string[] {
   return db.subCategories.map((s) => s.name);
 }
 
+export function getProductsByIds(ids: string[]): ProductResponse[] {
+  const idSet = new Set(ids);
+  return db.products
+    .filter((p) => idSet.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      title: p.title,
+      skuCode: p.skuCode,
+      brand: brandName(p.brandId),
+      categoryId: categoryName(p.categoryId),
+      subCategoryId: subCategoryName(p.subCategoryId),
+      segmentId: segmentName(p.segmentId),
+      globalWholesalePrice: p.globalWholesalePrice,
+    }));
+}
+
 export function getPricingProfiles(): PricingProfile[] {
   return db.pricingProfiles;
 }

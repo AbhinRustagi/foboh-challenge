@@ -64,7 +64,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { Product, Customer } from "@/data/constants";
+import type { Product, Customer, CalculatedPrice } from "@/data/constants";
 import { BASED_ON_PROFILES } from "@/data/constants";
 import { toast } from "sonner";
 import {
@@ -72,6 +72,7 @@ import {
   fetchCustomers,
   fetchSegments,
   fetchBrands,
+  calculatePrices,
   createPricingProfile,
 } from "@/lib/fetchers";
 
@@ -102,26 +103,6 @@ const BRAND_COLORS: Record<string, string> = {
 const DEFAULT_ADJUSTMENT = 5;
 
 // ── Helpers ──
-
-function calculateNewPrice(
-  basedOnPrice: number,
-  adjustment: number,
-  mode: "fixed" | "dynamic",
-  direction: "increase" | "decrease",
-): number {
-  let result: number;
-  if (mode === "fixed") {
-    result =
-      direction === "increase"
-        ? basedOnPrice + adjustment
-        : basedOnPrice - adjustment;
-  } else {
-    const delta = (adjustment / 100) * basedOnPrice;
-    result =
-      direction === "increase" ? basedOnPrice + delta : basedOnPrice - delta;
-  }
-  return Math.max(0, Math.round(result * 100) / 100);
-}
 
 function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`;
@@ -189,6 +170,21 @@ export function PricingSetup() {
     queryKey: ["brands"],
     queryFn: fetchBrands,
   });
+  const [calculatedPrices, setCalculatedPrices] = useState<
+    Map<string, CalculatedPrice>
+  >(new Map());
+
+  const priceMutation = useMutation({
+    mutationFn: calculatePrices,
+    onSuccess: (data) => {
+      const map = new Map<string, CalculatedPrice>();
+      for (const item of data) {
+        map.set(item.productId, item);
+      }
+      setCalculatedPrices(map);
+    },
+  });
+
   const publishMutation = useMutation({
     mutationFn: createPricingProfile,
     onSuccess: () => toast.success("Saved pricing profile"),
@@ -301,6 +297,23 @@ export function PricingSetup() {
 
   function getBasedOnPrice(product: Product): number {
     return product.globalWholesalePrice;
+  }
+
+  function refreshPriceTable() {
+    const ids = form.getValues("selectedProductIds");
+    if (ids.length === 0) return;
+
+    const currentAdjustments: Record<string, number> = {};
+    for (const id of ids) {
+      currentAdjustments[id] = getAdjustment(id);
+    }
+
+    priceMutation.mutate({
+      productIds: ids,
+      adjustmentMode: form.getValues("adjustmentMode"),
+      incrementMode: form.getValues("incrementMode"),
+      adjustments: currentAdjustments,
+    });
   }
 
   // ── Handlers: customers ──
@@ -939,9 +952,18 @@ export function PricingSetup() {
                         type="button"
                         variant="link"
                         className="flex items-center gap-1.5 text-sm text-foboh-purple hover:underline"
+                        onClick={refreshPriceTable}
+                        disabled={
+                          priceMutation.isPending ||
+                          selectedProducts.length === 0
+                        }
                       >
-                        Refresh New Price Table
-                        <RotateCcw className="size-3.5" />
+                        {priceMutation.isPending
+                          ? "Calculating..."
+                          : "Refresh New Price Table"}
+                        <RotateCcw
+                          className={`size-3.5 ${priceMutation.isPending ? "animate-spin" : ""}`}
+                        />
                       </Button>
                     </div>
 
@@ -981,14 +1003,13 @@ export function PricingSetup() {
                           </TableHeader>
                           <TableBody>
                             {selectedProducts.map((product) => {
-                              const basedOnPrice = getBasedOnPrice(product);
-                              const adj = getAdjustment(product.id);
-                              const newPrice = calculateNewPrice(
-                                basedOnPrice,
-                                adj,
-                                adjustmentMode,
-                                incrementMode,
+                              const calculated = calculatedPrices.get(
+                                product.id,
                               );
+                              const basedOnPrice =
+                                calculated?.basedOnPrice ??
+                                getBasedOnPrice(product);
+                              const adj = getAdjustment(product.id);
                               const sign =
                                 incrementMode === "decrease" ? "-" : "+";
                               return (
@@ -1040,7 +1061,9 @@ export function PricingSetup() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right font-medium">
-                                    {formatCurrency(newPrice)}
+                                    {calculated
+                                      ? formatCurrency(calculated.newPrice)
+                                      : "—"}
                                   </TableCell>
                                 </TableRow>
                               );

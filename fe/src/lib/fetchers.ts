@@ -1,4 +1,9 @@
-import type { Product, Customer } from "@/data/constants";
+import type {
+  Product,
+  Customer,
+  CalculatePricesRequest,
+  CalculatedPrice,
+} from "@/data/constants";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -40,6 +45,20 @@ export async function fetchSegments(): Promise<string[]> {
 
 export async function fetchBrands(): Promise<string[]> {
   return fetchJson<string[]>("/brands");
+}
+
+export async function calculatePrices(
+  data: CalculatePricesRequest,
+): Promise<CalculatedPrice[]> {
+  const response = await fetch(`${API_URL}/products/calculate-prices`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.statusText}`);
+  }
+  return response.json() as Promise<CalculatedPrice[]>;
 }
 
 export async function createPricingProfile(data: unknown): Promise<unknown> {

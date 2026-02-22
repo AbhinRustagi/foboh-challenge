@@ -90,3 +90,19 @@ export const CreatePricingProfileSchema = z.object({
 export type CreatePricingProfileRequest = z.infer<
   typeof CreatePricingProfileSchema
 >;
+
+export const CalculatePricesSchema = z.object({
+  productIds: z.array(z.string()).min(1),
+  adjustmentMode: z.enum(["fixed", "dynamic"]),
+  incrementMode: z.enum(["increase", "decrease"]),
+  adjustments: z.record(z.string(), z.number().min(0)),
+});
+
+export type CalculatePricesRequest = z.infer<typeof CalculatePricesSchema>;
+
+export type CalculatedPrice = {
+  productId: string;
+  basedOnPrice: number;
+  adjustment: number;
+  newPrice: number;
+};
