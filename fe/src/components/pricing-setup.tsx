@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -696,9 +697,21 @@ export function PricingSetup() {
 
                     {/* Product list */}
                     {productsQuery.isLoading && (
-                      <p className="py-8 text-center text-sm text-muted-foreground">
-                        Loading products...
-                      </p>
+                      <div className="space-y-1">
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-3 px-2 py-2"
+                          >
+                            <Skeleton className="size-4 rounded" />
+                            <Skeleton className="size-10 rounded" />
+                            <div className="space-y-1.5">
+                              <Skeleton className="h-3.5 w-36" />
+                              <Skeleton className="h-3 w-48" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                     {productsQuery.isError && (
                       <div className="py-8 text-center">
@@ -1213,9 +1226,21 @@ export function PricingSetup() {
 
                     {/* Customer list */}
                     {customersQuery.isLoading && (
-                      <p className="py-8 text-center text-sm text-muted-foreground">
-                        Loading customers...
-                      </p>
+                      <div className="space-y-1">
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-3 px-2 py-2"
+                          >
+                            <Skeleton className="size-4 rounded" />
+                            <Skeleton className="size-10 rounded-full" />
+                            <div className="space-y-1.5">
+                              <Skeleton className="h-3.5 w-32" />
+                              <Skeleton className="h-3 w-24" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                     {customersQuery.isError && (
                       <div className="py-8 text-center">
