@@ -4,7 +4,7 @@ import { PricingSetup } from "@/components/pricing-setup";
 
 export default function Home() {
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen>
       <AppSidebar />
       <SidebarInset>
         <PricingSetup />

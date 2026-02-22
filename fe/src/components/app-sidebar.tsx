@@ -10,6 +10,7 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
 } from "@/components/ui/sidebar";
 import {
   Blocks,
@@ -36,7 +37,10 @@ const NAV_ITEMS = [
 
 export function AppSidebar() {
   return (
-    <Sidebar className="group-data-[side=left]:border-r-0">
+    <Sidebar
+      collapsible="icon"
+      className="group-data-[side=left]:border-r-0"
+    >
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
@@ -73,7 +77,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="group-data-[collapsible=icon]:hidden">
         <div className="px-3 pb-4 flex items-center">
           <Image
             width={100}
@@ -84,6 +88,7 @@ export function AppSidebar() {
           />
         </div>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
