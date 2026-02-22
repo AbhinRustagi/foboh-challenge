@@ -993,11 +993,11 @@ export function PricingSetup() {
 
                     {/* Price table */}
                     {selectedProducts.length > 0 ? (
-                      <div className="rounded-lg border">
+                      <div className="rounded-lg">
                         <Table>
                           <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-8">
+                            <TableRow className="border-b text-muted-foreground">
+                              <TableHead className="w-10 text-muted-foreground font-normal">
                                 <Checkbox
                                   checked={
                                     selectedProducts.length ===
@@ -1011,16 +1011,22 @@ export function PricingSetup() {
                                   }
                                 />
                               </TableHead>
-                              <TableHead>Product Title</TableHead>
-                              <TableHead>SKU Code</TableHead>
-                              <TableHead>Category</TableHead>
-                              <TableHead className="text-right">
-                                {basedOnLabel}
+                              <TableHead className="text-muted-foreground font-normal">
+                                Product Title
                               </TableHead>
-                              <TableHead className="text-center">
+                              <TableHead className="text-muted-foreground font-normal">
+                                SKU Code
+                              </TableHead>
+                              <TableHead className="text-muted-foreground font-normal">
+                                Category
+                              </TableHead>
+                              <TableHead className="text-center text-muted-foreground font-normal">
+                                Based on {basedOnLabel}
+                              </TableHead>
+                              <TableHead className="text-muted-foreground font-normal">
                                 Adjustment
                               </TableHead>
-                              <TableHead className="text-right">
+                              <TableHead className="text-right font-medium">
                                 New Price
                               </TableHead>
                             </TableRow>
@@ -1037,7 +1043,7 @@ export function PricingSetup() {
                               const sign =
                                 incrementMode === "decrease" ? "-" : "+";
                               return (
-                                <TableRow key={product.id}>
+                                <TableRow key={product.id} className="border-b">
                                   <TableCell>
                                     <Checkbox
                                       checked={selectedIds.includes(product.id)}
@@ -1046,20 +1052,23 @@ export function PricingSetup() {
                                       }
                                     />
                                   </TableCell>
-                                  <TableCell className="font-medium">
+                                  <TableCell className="border-l py-4 font-medium">
                                     {product.title}
                                   </TableCell>
-                                  <TableCell className="text-muted-foreground">
+                                  <TableCell className="border-l text-foreground font-medium">
                                     {product.skuCode}
                                   </TableCell>
-                                  <TableCell className="text-muted-foreground">
+                                  <TableCell className="border-l text-foreground font-medium">
                                     {product.subCategoryId}
                                   </TableCell>
-                                  <TableCell className="text-right">
+                                  <TableCell className="border-l text-center text-muted-foreground font-medium">
                                     {formatCurrency(basedOnPrice)}
                                   </TableCell>
-                                  <TableCell className="text-center">
-                                    <div className="inline-flex items-center gap-1 rounded bg-foboh/10 px-3 py-1.5 text-sm text-foboh">
+                                  <TableCell
+                                    width={150}
+                                    className="border-l p-4 border-[#08822A] border bg-[#f4fff7]"
+                                  >
+                                    <div className="flex gap-2 text-sm">
                                       <span>
                                         {sign}
                                         {adjustmentMode === "fixed" ? "$ " : ""}
@@ -1073,7 +1082,7 @@ export function PricingSetup() {
                                             Number(e.target.value),
                                           )
                                         }
-                                        className="w-16 border-none bg-transparent text-center text-sm outline-none"
+                                        className="w-full bg-transparent text-sm border-0 outline-none shadow-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none font-medium"
                                         min={0}
                                         step={
                                           adjustmentMode === "fixed" ? 0.01 : 1
@@ -1084,7 +1093,7 @@ export function PricingSetup() {
                                       )}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-right font-medium">
+                                  <TableCell className="border-l text-right font-medium">
                                     {calculated
                                       ? formatCurrency(calculated.newPrice)
                                       : "—"}
