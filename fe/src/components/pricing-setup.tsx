@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -315,6 +315,30 @@ export function PricingSetup() {
       adjustments: currentAdjustments,
     });
   }
+
+  // Auto-recalculate prices when inputs change (debounced)
+  const adjustmentsJson = JSON.stringify(adjustments);
+  const debouncedAdjustments = useDebouncedValue(adjustmentsJson);
+
+  useEffect(() => {
+    if (selectedIds.length === 0) {
+      setCalculatedPrices(new Map());
+      return;
+    }
+
+    const currentAdjustments: Record<string, number> = {};
+    for (const id of selectedIds) {
+      currentAdjustments[id] = adjustments[id] ?? DEFAULT_ADJUSTMENT;
+    }
+
+    priceMutation.mutate({
+      productIds: selectedIds,
+      adjustmentMode,
+      incrementMode,
+      adjustments: currentAdjustments,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, adjustmentMode, incrementMode, debouncedAdjustments]);
 
   // ── Handlers: customers ──
 
