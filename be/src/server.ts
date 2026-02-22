@@ -42,6 +42,8 @@ app.use(pricingProfilesRouter);
 
 app.get("/", (req, res) => res.status(200).json({ success: true }));
 
+export { app };
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

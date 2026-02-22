@@ -192,6 +192,21 @@
         "c7",
         "c8"
       ]
+    },
+    {
+      "id": "pp-1771729317744",
+      "name": "Profile 1771729317744",
+      "basedOn": "global",
+      "adjustmentMode": "fixed",
+      "incrementMode": "decrease",
+      "adjustments": {
+        "1": 5,
+        "2": 10
+      },
+      "customerIds": [
+        "c1",
+        "c2"
+      ]
     }
   ]
 }

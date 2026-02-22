@@ -1,7 +1,7 @@
 import type { CalculatedPrice } from "./types";
 import { getProductsByIds } from "../infrastructure/database";
 
-function calculateNewPrice(
+export function calculateNewPrice(
   basedOnPrice: number,
   adjustment: number,
   mode: "fixed" | "dynamic",
