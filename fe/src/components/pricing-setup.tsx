@@ -1,24 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import {
-  ArrowUp,
-  Search,
-  HelpCircle,
-  Settings,
-  Pencil,
-  RefreshCw,
-  Info,
-  X,
-  Users,
-  Lightbulb,
-  RotateCcw,
-} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -27,7 +9,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,6 +18,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -56,25 +45,34 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import type { Product, Customer, CalculatedPrice } from "@/data/constants";
+import type { CalculatedPrice, Product } from "@/data/constants";
 import { BASED_ON_PROFILES } from "@/data/constants";
-import { toast } from "sonner";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
-  fetchProducts,
-  fetchCustomers,
-  fetchSegments,
-  fetchBrands,
   calculatePrices,
   createPricingProfile,
+  fetchBrands,
+  fetchCustomers,
+  fetchProducts,
+  fetchSegments,
 } from "@/lib/fetchers";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  ArrowUp,
+  HelpCircle,
+  Lightbulb,
+  Pencil,
+  RotateCcw,
+  Search,
+  Settings,
+  Users,
+  X,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 // ── Schema ──
 
@@ -471,10 +469,10 @@ export function PricingSetup() {
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <Button variant="ghost" size="sm">
+                  <Button type="button" variant="ghost" size="sm">
                     Cancel
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button type="button" variant="outline" size="sm">
                     Save as Draft
                   </Button>
                 </div>
@@ -1440,14 +1438,15 @@ export function PricingSetup() {
                           </p>
                         </div>
                       </div>
-                      <button
-                        type="button"
+                      <Button
                         onClick={() => setCurrentStep(3)}
+                        variant="ghost"
+                        type="button"
                         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                       >
                         <Pencil className="size-3.5" />
                         Make Changes
-                      </button>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
