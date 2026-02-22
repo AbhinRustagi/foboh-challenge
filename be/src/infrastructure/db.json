@@ -1,0 +1,197 @@
+{
+  "categories": [
+    {
+      "id": "cat1",
+      "name": "Alcoholic Beverage"
+    }
+  ],
+  "subCategories": [
+    {
+      "id": "sub1",
+      "name": "Wine",
+      "categoryId": "cat1"
+    },
+    {
+      "id": "sub2",
+      "name": "Beer",
+      "categoryId": "cat1"
+    },
+    {
+      "id": "sub3",
+      "name": "Liquor & Spirits",
+      "categoryId": "cat1"
+    },
+    {
+      "id": "sub4",
+      "name": "Cider",
+      "categoryId": "cat1"
+    },
+    {
+      "id": "sub5",
+      "name": "Premixed & Ready-to-Drink",
+      "categoryId": "cat1"
+    },
+    {
+      "id": "sub6",
+      "name": "Other",
+      "categoryId": "cat1"
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg1",
+      "name": "Red"
+    },
+    {
+      "id": "seg2",
+      "name": "White"
+    },
+    {
+      "id": "seg3",
+      "name": "Rose"
+    },
+    {
+      "id": "seg4",
+      "name": "Orange"
+    },
+    {
+      "id": "seg5",
+      "name": "Sparkling"
+    },
+    {
+      "id": "seg6",
+      "name": "Port/Dessert"
+    }
+  ],
+  "brands": [
+    {
+      "id": "br1",
+      "name": "High Garden"
+    },
+    {
+      "id": "br2",
+      "name": "Koyama Wines"
+    },
+    {
+      "id": "br3",
+      "name": "Lacourte-Godbillon"
+    }
+  ],
+  "products": [
+    {
+      "id": "1",
+      "title": "High Garden Pinot Noir 2021",
+      "skuCode": "HGVPIN216",
+      "brandId": "br1",
+      "categoryId": "cat1",
+      "subCategoryId": "sub1",
+      "segmentId": "seg1",
+      "globalWholesalePrice": 279.06
+    },
+    {
+      "id": "2",
+      "title": "Koyama Methode Brut Nature NV",
+      "skuCode": "KOYBRUNV6",
+      "brandId": "br2",
+      "categoryId": "cat1",
+      "subCategoryId": "sub1",
+      "segmentId": "seg5",
+      "globalWholesalePrice": 120
+    },
+    {
+      "id": "3",
+      "title": "Koyama Riesling 2018",
+      "skuCode": "KOYNR1837",
+      "brandId": "br2",
+      "categoryId": "cat1",
+      "subCategoryId": "sub1",
+      "segmentId": "seg6",
+      "globalWholesalePrice": 215.04
+    },
+    {
+      "id": "4",
+      "title": "Koyama Tussock Riesling 2019",
+      "skuCode": "KOYRIE19",
+      "brandId": "br2",
+      "categoryId": "cat1",
+      "subCategoryId": "sub1",
+      "segmentId": "seg2",
+      "globalWholesalePrice": 215.04
+    },
+    {
+      "id": "5",
+      "title": "Lacourte-Godbillon Brut Cru NV",
+      "skuCode": "LACBNATNV6",
+      "brandId": "br3",
+      "categoryId": "cat1",
+      "subCategoryId": "sub1",
+      "segmentId": "seg5",
+      "globalWholesalePrice": 409.32
+    }
+  ],
+  "customers": [
+    {
+      "id": "c1",
+      "name": "James Wilson",
+      "business": "Wilson's Wine Bar"
+    },
+    {
+      "id": "c2",
+      "name": "Sarah Chen",
+      "business": "The Barrel Room"
+    },
+    {
+      "id": "c3",
+      "name": "Marcus Thompson",
+      "business": "Riverside Bottleshop"
+    },
+    {
+      "id": "c4",
+      "name": "Emily Rodriguez",
+      "business": "Craft & Cork"
+    },
+    {
+      "id": "c5",
+      "name": "David Park",
+      "business": "Park Avenue Cellars"
+    },
+    {
+      "id": "c6",
+      "name": "Lisa Nguyen",
+      "business": "Nguyen's Fine Wines"
+    },
+    {
+      "id": "c7",
+      "name": "Tom Bradley",
+      "business": "Bradley's Pub & Grill"
+    },
+    {
+      "id": "c8",
+      "name": "Anna Kowalski",
+      "business": "The Wine Collective"
+    }
+  ],
+  "pricingProfiles": [
+    {
+      "id": "pp-1771722264141",
+      "name": "Profile 1771722264141",
+      "basedOn": "global",
+      "adjustmentMode": "fixed",
+      "incrementMode": "decrease",
+      "adjustments": {
+        "1": 5,
+        "5": 5
+      },
+      "customerIds": [
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5",
+        "c6",
+        "c7",
+        "c8"
+      ]
+    }
+  ]
+}

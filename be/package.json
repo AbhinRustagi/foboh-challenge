@@ -5,14 +5,23 @@
   "license": "ISC",
   "author": "",
   "type": "commonjs",
-  "main": "index.js",
+  "main": "src/server.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx --watch src/server.ts",
+    "start": "tsx src/server.ts"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "fuse.js": "^7.1.0",
     "lodash": "^4.17.23",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }
