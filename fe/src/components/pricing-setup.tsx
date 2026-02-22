@@ -66,6 +66,7 @@ import {
 } from "@/components/ui/form";
 import type { Product, Customer } from "@/data/constants";
 import { BASED_ON_PROFILES } from "@/data/constants";
+import { toast } from "sonner";
 import {
   fetchProducts,
   fetchCustomers,
@@ -190,6 +191,7 @@ export function PricingSetup() {
   });
   const publishMutation = useMutation({
     mutationFn: createPricingProfile,
+    onSuccess: () => toast.success("Saved pricing profile"),
   });
 
   const products = productsQuery.data ?? [];
