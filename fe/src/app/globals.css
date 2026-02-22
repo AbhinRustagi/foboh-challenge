@@ -6,6 +6,8 @@
 
 @theme inline {
   --color-foboh: #147d73;
+  --color-foboh-brown: #a26306;
+  --color-foboh-purple: #563fe3;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);

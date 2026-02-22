@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -15,6 +16,8 @@ import {
   Info,
   X,
   Users,
+  Lightbulb,
+  RotateCcw,
 } from "lucide-react";
 import {
   Breadcrumb,
@@ -148,14 +151,33 @@ export function PricingSetup() {
   const [brandFilter, setBrandFilter] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
 
+  // Debounced values for server-side search
+  const debouncedSearch = useDebouncedValue(searchQuery);
+  const debouncedSku = useDebouncedValue(skuFilter);
+  const debouncedCustomerSearch = useDebouncedValue(customerSearch);
+
   // Data from backend
   const productsQuery = useQuery({
-    queryKey: ["products"],
-    queryFn: () => fetchProducts(),
+    queryKey: [
+      "products",
+      debouncedSearch,
+      debouncedSku,
+      categoryFilter,
+      segmentFilter,
+      brandFilter,
+    ],
+    queryFn: () =>
+      fetchProducts({
+        search: debouncedSearch,
+        sku: debouncedSku,
+        category: categoryFilter,
+        segment: segmentFilter,
+        brand: brandFilter,
+      }),
   });
   const customersQuery = useQuery({
-    queryKey: ["customers"],
-    queryFn: () => fetchCustomers(),
+    queryKey: ["customers", debouncedCustomerSearch],
+    queryFn: () => fetchCustomers(debouncedCustomerSearch),
   });
   const segmentsQuery = useQuery({
     queryKey: ["segments"],
@@ -192,40 +214,8 @@ export function PricingSetup() {
   const adjustments = form.watch("adjustments");
   const selectedCustomerIds = form.watch("selectedCustomerIds");
 
-  // ── Derived: products ──
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const query = searchQuery.toLowerCase();
-      const sku = skuFilter.toLowerCase();
-      const matchesSearch =
-        !query ||
-        p.title.toLowerCase().includes(query) ||
-        p.skuCode.toLowerCase().includes(query);
-      const matchesSku =
-        !sku ||
-        p.skuCode.toLowerCase().includes(sku) ||
-        p.title.toLowerCase().includes(sku);
-      const matchesCategory =
-        !categoryFilter || p.subCategoryId === categoryFilter;
-      const matchesSegment = !segmentFilter || p.segmentId === segmentFilter;
-      const matchesBrand = !brandFilter || p.brand === brandFilter;
-      return (
-        matchesSearch &&
-        matchesSku &&
-        matchesCategory &&
-        matchesSegment &&
-        matchesBrand
-      );
-    });
-  }, [
-    products,
-    searchQuery,
-    skuFilter,
-    categoryFilter,
-    segmentFilter,
-    brandFilter,
-  ]);
+  // Products are already filtered server-side via query params
+  const filteredProducts = products;
 
   const activeFilters: { label: string; clear: () => void }[] = [];
   if (categoryFilter)
@@ -245,17 +235,8 @@ export function PricingSetup() {
   const basedOnProfile = BASED_ON_PROFILES.find((p) => p.id === basedOn);
   const basedOnLabel = basedOnProfile?.name ?? "Global Wholesale Price";
 
-  // ── Derived: customers ──
-
-  const filteredCustomers = useMemo(() => {
-    if (!customerSearch) return customers;
-    const query = customerSearch.toLowerCase();
-    return customers.filter(
-      (c) =>
-        c.name.toLowerCase().includes(query) ||
-        c.business.toLowerCase().includes(query),
-    );
-  }, [customers, customerSearch]);
+  // Customers are already filtered server-side via query params
+  const filteredCustomers = customers;
 
   const selectedCustomers = customers.filter((c) =>
     selectedCustomerIds.includes(c.id),
@@ -391,7 +372,7 @@ export function PricingSetup() {
   return (
     <div className="flex min-h-screen flex-col">
       {/* ── Header ── */}
-      <header className="flex items-center justify-between bg-foboh px-6 py-6 text-white">
+      <header className="sticky top-0 z-100 flex items-center justify-between bg-foboh px-6 py-6 text-white">
         <div>
           <p className="text-base font-medium">Hello, Ekemini</p>
           <p className="text-xs text-white/80">
@@ -404,12 +385,12 @@ export function PricingSetup() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <button type="button" className="rounded-full bg-white/20 p-2">
+          <Button variant="default" className="rounded-full bg-white/20 p-2">
             <HelpCircle className="size-4" />
-          </button>
-          <button type="button" className="rounded-full bg-white/20 p-2">
+          </Button>
+          <Button variant="default" className="rounded-full bg-white/20 p-2">
             <Settings className="size-4" />
-          </button>
+          </Button>
           <div className="flex items-center gap-2">
             <div className="text-right text-xs">
               <p className="font-medium">Ekemini Mark</p>
@@ -460,7 +441,7 @@ export function PricingSetup() {
               </div>
               {/* ══ Step 1: Basic Pricing Profile (always completed) ══ */}
               <Card className="mb-4">
-                <CardHeader className="flex items-start justify-between">
+                <CardHeader className="flex items-center justify-between">
                   <div className="space-y-1.5">
                     <CardTitle className="text-lg font-medium">
                       Basic Pricing Profile
@@ -498,13 +479,14 @@ export function PricingSetup() {
                         (Date Here)
                       </p>
                     </div>
-                    <button
+                    <Button
+                      variant="ghost"
                       type="button"
                       className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                     >
                       <Pencil className="size-3.5" />
                       Make Changes
-                    </button>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -669,13 +651,15 @@ export function PricingSetup() {
                           className="gap-1 pl-2 pr-1"
                         >
                           {f.label}
-                          <button
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             type="button"
                             onClick={f.clear}
-                            className="rounded-full p-0.5 hover:bg-muted"
+                            className="rounded-full p-0.5 hover:bg-muted has-[>svg]:px-1 h-2"
                           >
                             <X className="size-3" />
-                          </button>
+                          </Button>
                         </Badge>
                       ))}
                     </div>
@@ -683,26 +667,30 @@ export function PricingSetup() {
                     {/* Select / deselect all */}
                     {selectionType !== "one" && (
                       <div className="mb-3 flex items-center gap-4 text-sm">
-                        <button
+                        <Button
+                          size="sm"
                           type="button"
+                          variant="ghost"
                           onClick={deselectAllProducts}
-                          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground has-[>svg]:px-1 px-2"
                         >
                           <span className="flex size-4 items-center justify-center rounded-full border">
                             <X className="size-2.5" />
                           </span>
                           Deselect All
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          size="sm"
                           type="button"
+                          variant="ghost"
                           onClick={selectAllProducts}
-                          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground has-[>svg]:px-1 px-2"
                         >
                           <span className="flex size-4 items-center justify-center rounded-full border">
                             <span className="size-2 rounded-full bg-current" />
                           </span>
                           Select all
-                        </button>
+                        </Button>
                       </div>
                     )}
 
@@ -717,78 +705,82 @@ export function PricingSetup() {
                         <p className="text-sm text-destructive">
                           Failed to load products.
                         </p>
-                        <button
+                        <Button
+                          size="sm"
                           type="button"
+                          variant="link"
                           onClick={() => productsQuery.refetch()}
                           className="mt-2 text-sm text-foboh hover:underline"
                         >
                           Retry
-                        </button>
+                        </Button>
                       </div>
                     )}
                     {productsQuery.isSuccess && (
-                    <FormField
-                      control={form.control}
-                      name="selectedProductIds"
-                      render={() => (
-                        <FormItem className="mb-4">
-                          <div className="space-y-1">
-                            {filteredProducts.map((product) => {
-                              const isSelected = selectedIds.includes(
-                                product.id,
-                              );
-                              const color =
-                                BRAND_COLORS[product.brand] ?? "bg-gray-500";
-                              return (
-                                <label
-                                  key={product.id}
-                                  className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50"
-                                >
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={() =>
-                                      toggleProduct(product.id)
-                                    }
-                                  />
-                                  <div
-                                    className={`flex size-10 shrink-0 items-center justify-center rounded text-xs font-bold text-white ${color}`}
+                      <FormField
+                        control={form.control}
+                        name="selectedProductIds"
+                        render={() => (
+                          <FormItem className="mb-4">
+                            <div className="space-y-1">
+                              {filteredProducts.map((product) => {
+                                const isSelected = selectedIds.includes(
+                                  product.id,
+                                );
+                                const color =
+                                  BRAND_COLORS[product.brand] ?? "bg-gray-500";
+                                return (
+                                  <label
+                                    key={product.id}
+                                    className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50"
                                   >
-                                    {product.title.slice(0, 2).toUpperCase()}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium leading-tight">
-                                      {product.title}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      SKU {product.skuCode} &middot;{" "}
-                                      {product.subCategoryId} &middot;{" "}
-                                      {product.segmentId}
-                                    </p>
-                                  </div>
-                                </label>
-                              );
-                            })}
-                            {filteredProducts.length === 0 && (
-                              <p className="py-8 text-center text-sm text-muted-foreground">
-                                No products match your filters.
-                              </p>
-                            )}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() =>
+                                        toggleProduct(product.id)
+                                      }
+                                    />
+                                    <div
+                                      className={`flex size-10 shrink-0 items-center justify-center rounded text-xs font-bold text-white ${color}`}
+                                    >
+                                      {product.title.slice(0, 2).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium leading-tight">
+                                        {product.title}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        SKU {product.skuCode} &middot;{" "}
+                                        {product.subCategoryId} &middot;{" "}
+                                        {product.segmentId}
+                                      </p>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                              {filteredProducts.length === 0 && (
+                                <p className="py-8 text-center text-sm text-muted-foreground">
+                                  No products match your filters.
+                                </p>
+                              )}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
 
                     {selectedProducts.length > 0 && (
-                      <p className="mb-4 text-sm">
+                      <p className="mb-4 text-sm text-muted-foreground">
                         You&apos;ve selected{" "}
-                        <span className="font-medium">
+                        <span className="font-medium text-foreground">
                           {selectedProducts.length} Product
                           {selectedProducts.length !== 1 ? "s" : ""}
                         </span>
                         , these will be added{" "}
-                        <span className="font-medium">(Heaps Normal #4)</span>
+                        <span className="font-medium text-foreground">
+                          (Heaps Normal #4)
+                        </span>
                       </p>
                     )}
 
@@ -800,7 +792,9 @@ export function PricingSetup() {
                       name="basedOn"
                       render={({ field }) => (
                         <FormItem className="mb-6">
-                          <FormLabel className="text-sm">Based on</FormLabel>
+                          <FormLabel className="text-sm font-normal text-muted-foreground">
+                            Based on
+                          </FormLabel>
                           <FormControl>
                             <Select
                               value={field.value}
@@ -828,8 +822,8 @@ export function PricingSetup() {
                       control={form.control}
                       name="adjustmentMode"
                       render={({ field }) => (
-                        <FormItem className="mb-4">
-                          <FormLabel className="text-sm">
+                        <FormItem className="mb-6">
+                          <FormLabel className="text-sm font-normal text-muted-foreground">
                             Set Price Adjustment Mode
                           </FormLabel>
                           <FormControl>
@@ -871,8 +865,8 @@ export function PricingSetup() {
                       control={form.control}
                       name="incrementMode"
                       render={({ field }) => (
-                        <FormItem className="mb-4">
-                          <FormLabel className="text-sm">
+                        <FormItem className="mb-6">
+                          <FormLabel className="text-sm font-normal text-muted-foreground">
                             Set Price Adjustment Increment Mode
                           </FormLabel>
                           <FormControl>
@@ -913,11 +907,11 @@ export function PricingSetup() {
                     />
 
                     {/* Info notice */}
-                    <div className="mb-6 flex items-center gap-2 text-sm">
-                      <Info className="size-4 shrink-0 text-amber-500" />
+                    <div className="mb-6 flex items-center gap-2 text-sm text-foboh-brown">
+                      <Lightbulb className="size-4 shrink-0 text-foboh-brown" />
                       <span>
                         The adjusted price will be calculated from{" "}
-                        <span className="font-medium text-foboh">
+                        <span className="font-medium text-foreground">
                           {basedOnLabel}
                         </span>{" "}
                         selected above
@@ -926,13 +920,14 @@ export function PricingSetup() {
 
                     {/* Refresh */}
                     <div className="mb-3 flex justify-end">
-                      <button
+                      <Button
                         type="button"
-                        className="flex items-center gap-1.5 text-sm text-foboh hover:underline"
+                        variant="link"
+                        className="flex items-center gap-1.5 text-sm text-foboh-purple hover:underline"
                       >
                         Refresh New Price Table
-                        <RefreshCw className="size-3.5" />
-                      </button>
+                        <RotateCcw className="size-3.5" />
+                      </Button>
                     </div>
 
                     {/* Price table */}
@@ -1067,7 +1062,7 @@ export function PricingSetup() {
               ) : (
                 /* Step 2 collapsed summary */
                 <Card className="mb-4">
-                  <CardHeader className="flex items-start justify-between">
+                  <CardHeader className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-lg font-medium">
                         Set Product Pricing
@@ -1089,21 +1084,21 @@ export function PricingSetup() {
                   <CardContent>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="flex -space-x-2">
+                        <div className="flex -space-x-4">
                           {selectedProducts.slice(0, 3).map((product) => {
                             const color =
                               BRAND_COLORS[product.brand] ?? "bg-gray-500";
                             return (
                               <div
                                 key={product.id}
-                                className={`flex size-8 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white ${color}`}
+                                className={`flex size-12 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white ${color}`}
                               >
                                 {product.title.slice(0, 2).toUpperCase()}
                               </div>
                             );
                           })}
                         </div>
-                        <div>
+                        <div className="space-y-1">
                           <p className="text-xs text-muted-foreground">
                             You&apos;ve selected{" "}
                             <span className="font-medium text-foreground">
@@ -1112,12 +1107,14 @@ export function PricingSetup() {
                             </span>
                           </p>
                           <p className="text-sm font-medium">
-                            {selectedProducts
-                              .slice(0, 3)
-                              .map((p) => p.title.split(" ")[0])
-                              .join(" & ")}
+                            {selectedProducts.length > 1
+                              ? selectedProducts
+                                  .slice(0, 3)
+                                  .map((p) => p.title.split(" ")[0])
+                                  .join(" & ")
+                              : selectedProducts[0].title}
                           </p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             With Price Adjustment Mode set to{" "}
                             <span className="font-medium text-foreground">
                               {adjustmentSummaryText()}
@@ -1125,14 +1122,14 @@ export function PricingSetup() {
                           </p>
                         </div>
                       </div>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
                         onClick={() => setCurrentStep(2)}
                         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                       >
                         <Pencil className="size-3.5" />
                         Make Changes
-                      </button>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -1168,8 +1165,8 @@ export function PricingSetup() {
                       Choose which customers this profile will be applied to
                     </CardDescription>
                   </CardHeader>
-                  <div className="px-4">
-                    <Separator className="px-6" />
+                  <div className="px-6">
+                    <Separator />
                   </div>
                   <CardContent>
                     {/* Customer search */}
@@ -1190,26 +1187,28 @@ export function PricingSetup() {
 
                     {/* Select / deselect all */}
                     <div className="mb-3 flex items-center gap-4 text-sm">
-                      <button
-                        type="button"
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         onClick={deselectAllCustomers}
-                        className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground has-[>svg]:px-1 px-2"
                       >
                         <span className="flex size-4 items-center justify-center rounded-full border">
                           <X className="size-2.5" />
                         </span>
                         Deselect All
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         onClick={selectAllCustomers}
-                        className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground has-[>svg]:px-1 px-2"
                       >
                         <span className="flex size-4 items-center justify-center rounded-full border">
                           <span className="size-2 rounded-full bg-current" />
                         </span>
                         Select all
-                      </button>
+                      </Button>
                     </div>
 
                     {/* Customer list */}
@@ -1233,59 +1232,59 @@ export function PricingSetup() {
                       </div>
                     )}
                     {customersQuery.isSuccess && (
-                    <FormField
-                      control={form.control}
-                      name="selectedCustomerIds"
-                      render={() => (
-                        <FormItem className="mb-4">
-                          <div className="space-y-1">
-                            {filteredCustomers.map((customer) => {
-                              const isSelected = selectedCustomerIds.includes(
-                                customer.id,
-                              );
-                              return (
-                                <label
-                                  key={customer.id}
-                                  className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50"
-                                >
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={() =>
-                                      toggleCustomer(customer.id)
-                                    }
-                                  />
-                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
-                                    {customer.name
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join("")}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium leading-tight">
-                                      {customer.name}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {customer.business}
-                                    </p>
-                                  </div>
-                                </label>
-                              );
-                            })}
-                            {filteredCustomers.length === 0 && (
-                              <p className="py-8 text-center text-sm text-muted-foreground">
-                                No customers match your search.
-                              </p>
-                            )}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="selectedCustomerIds"
+                        render={() => (
+                          <FormItem className="mb-4">
+                            <div className="space-y-1">
+                              {filteredCustomers.map((customer) => {
+                                const isSelected = selectedCustomerIds.includes(
+                                  customer.id,
+                                );
+                                return (
+                                  <label
+                                    key={customer.id}
+                                    className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50"
+                                  >
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() =>
+                                        toggleCustomer(customer.id)
+                                      }
+                                    />
+                                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                                      {customer.name
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium leading-tight">
+                                        {customer.name}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {customer.business}
+                                      </p>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                              {filteredCustomers.length === 0 && (
+                                <p className="py-8 text-center text-sm text-muted-foreground">
+                                  No customers match your search.
+                                </p>
+                              )}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
 
                     {selectedCustomers.length > 0 && (
-                      <p className="mb-4 text-sm">
-                        <span className="font-medium">
+                      <p className="mb-4 text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">
                           {selectedCustomers.length} customer
                           {selectedCustomers.length !== 1 ? "s" : ""}
                         </span>{" "}
