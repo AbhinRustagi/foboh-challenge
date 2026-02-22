@@ -55,3 +55,7 @@ Single page application matching the spec. The main component (`pricing-setup.ts
 ## Expansion Considerations
 
 The frontend communicates directly with the backend. In a larger application, I'd introduce a BFF (Backend for Frontend) layer between them for Nextjs. A BFF handles response transformation, aggregation across services, and keeps the frontend decoupled from backend domain models.
+
+## Use of AI
+
+Claude was used as a development aid during this project for scaffolding boilerplate code, writing tests, and accelerating implementation tasks. All architecture decisions, code review, and final implementation were my own.
